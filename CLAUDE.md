@@ -79,7 +79,7 @@ Several views poll (`LIVE_REFRESH_MS = 15000`) while mounted and online rather t
 
 `ScienceScene.tsx` (three.js scene + AR.js marker tracking, via `lib/arjs.ts`) is `React.lazy()`-loaded from `App.tsx` rather than statically imported — three.js is only needed once a student reaches the Observe screen, and lazy-loading it keeps it (and AR.js, already dynamically imported inside `lib/arjs.ts`) out of the bundle everyone downloads just to log in. Both usages (the direct AR-mode render and `ActivityVisual`'s internal fallback-mode use of it) sit inside one `<Suspense fallback={null}>` around the Observe screen's `ar-frame` div — a Suspense boundary follows the render tree, so wrapping the outer usage covers the inner one too.
 
-`data/modules.ts` (duplicated between `frontend/src` and `backend/src` — keep both in sync when editing module content) is the bundled fallback module library used when the API is unreachable, and also what the backend seeds into Postgres via `POST /api/modules/seed`.
+`data/modules.ts` lives in `backend/src/data`; `frontend/src/data/modules.ts` is just a one-line re-export of it (`export { modules } from "../../../backend/src/data/modules"`), so there's a single source of truth for module content — no manual sync needed. It's the bundled fallback module library used when the API is unreachable, and also what the backend seeds into Postgres via `POST /api/modules/seed`.
 
 ### Backend structure
 
