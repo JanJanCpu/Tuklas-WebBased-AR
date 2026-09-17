@@ -27,6 +27,13 @@ const REQUIRED_STAGES: Stage[] = ["Predict", "Observe", "Explain"];
 // screen unlock - without needing to navigate away and back.
 const LIVE_REFRESH_MS = 15000;
 
+// Not yet part of lib.dom.d.ts; Chrome/Edge-only event carrying the deferred
+// install prompt (see the beforeinstallprompt listener below).
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
+
 function stagesFor(recordsList: ActivityRecord[], moduleId: string): Set<Stage> {
   return new Set(recordsList.filter((record) => record.moduleId === moduleId).map((record) => record.stage));
 }
@@ -116,6 +123,8 @@ function Workspace({ user }: { user: AuthUser | null }) {
   const [deviceStatus, setDeviceStatus] = useState("Camera, WebGL, service worker, and storage readiness.");
   const [cameraStatus, setCameraStatus] = useState("Camera is off.");
   const [cameraReady, setCameraReady] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [installed, setInstalled] = useState(false);
 
   const visibleModules = useMemo(
     () => modules.filter((item) => `${item.title} ${item.subtitle} ${item.quarter} ${item.moduleTitle}`.toLowerCase().includes(query.toLowerCase())),
@@ -206,6 +215,34 @@ function Workspace({ user }: { user: AuthUser | null }) {
       window.removeEventListener("offline", handleOffline);
     };
   }, []);
+
+  // Chrome's own install banner/menu item is unreliable across OEM browser
+  // builds (e.g. budget-device MIUI Chrome); capture the event ourselves so
+  // Settings can offer an explicit "Install App" button instead.
+  useEffect(() => {
+    if (window.matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone) {
+      setInstalled(true);
+    }
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+    };
+    const handleAppInstalled = () => { setInstalled(true); setInstallPrompt(null); };
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
+  }, []);
+
+  async function installApp() {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+    if (choice.outcome === "accepted") setInstalled(true);
+    setInstallPrompt(null);
+  }
 
   useEffect(() => {
     localStorage.setItem("tuklas-view-mode", viewMode);
@@ -930,6 +967,12 @@ function Workspace({ user }: { user: AuthUser | null }) {
 
         {screen === "settings" && (
           <section className="screen active">
+            {!installed && installPrompt && (
+              <button className="settings-row" onClick={installApp}><span><strong>Install App</strong><small>Add Tuklas to your home screen, like a regular app.</small></span><span aria-hidden="true">&gt;</span></button>
+            )}
+            {installed && (
+              <article className="panel-card"><p className="eyebrow">Installed</p><p>Tuklas is installed on this device.</p></article>
+            )}
             <button className="settings-row" onClick={prepareOffline}><span><strong>Prepare for Offline Use</strong><small>{offlineStatus}</small></span><span aria-hidden="true">&gt;</span></button>
             <button className="settings-row" onClick={handleSync}><span><strong>Sync Saved Work</strong><small>{records.filter((record) => !record.syncedAt).length} records waiting to sync.</small></span><span aria-hidden="true">&gt;</span></button>
             <button className="settings-row" onClick={checkDevice}><span><strong>Device Check</strong><small>{deviceStatus}</small></span><span aria-hidden="true">&gt;</span></button>
