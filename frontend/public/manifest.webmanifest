@@ -6,5 +6,10 @@
   "background_color": "#f5f8fd",
   "theme_color": "#0f4c9a",
   "description": "Offline-capable marker-based WebAR app for Predict-Observe-Explain science activities.",
-  "icons": []
+  "icons": [
+    { "src": "/assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
 }
