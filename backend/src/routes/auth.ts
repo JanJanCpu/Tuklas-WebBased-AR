@@ -33,7 +33,7 @@ function toPublicUser(user: {
     name: user.name,
     sectionId: user.sectionId,
     createdAt: user.createdAt,
-    ...(user.role === "student" && "enrolledSection" in user ? {
+    ...(user.role === "student" ? {
       sectionName: user.enrolledSection?.name ?? null,
       teacherName: user.enrolledSection?.teacher.name ?? user.createdBy?.name ?? null,
     } : {}),

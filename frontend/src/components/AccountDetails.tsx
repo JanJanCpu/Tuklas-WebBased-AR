@@ -28,11 +28,14 @@ export function AccountDetails({ user }: { user: AuthUser }) {
       try {
         const result = await fetchMyAccount();
         if (cancelled || getToken() !== token) return;
-        if (result.user?.id !== user.id || result.user.teacherName === undefined || result.user.sectionName === undefined) {
-          throw new Error("Incomplete account response");
+        if (result.user?.id !== user.id) {
+          throw new Error("Account response did not match the signed-in user.");
         }
-        setAccount(result.user);
-        cacheAccount(token, result.user);
+        // teacherName/sectionName default to null (shown as "Not assigned") rather than
+        // failing the whole request, since a student legitimately may not have either yet.
+        const nextAccount = { ...result.user, teacherName: result.user.teacherName ?? null, sectionName: result.user.sectionName ?? null };
+        setAccount(nextAccount);
+        cacheAccount(token, nextAccount);
       } catch (cause) {
         if (cancelled || getToken() !== token) return;
         // Keep cached enrollment, but distinguish a server failure from being offline.
