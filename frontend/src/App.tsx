@@ -979,7 +979,17 @@ function Workspace({ user }: { user: AuthUser | null }) {
             <article className="panel-card offline-checklist"><p className="eyebrow">Offline Setup</p><ol><li>Open this HTTPS app while connected.</li><li>Tap Prepare for Offline Use.</li><li>Add the app to the home screen.</li><li>Reopen in airplane mode and run one trial.</li></ol></article>
             {!isTeacherPreview && (
               <article className="panel-card teacher-tools">
-                <div className="row-between"><h2>Saved Work</h2><button className="text-button compact-button" onClick={async () => { if (!user) return; await recordSession.current?.clear(); showToast("Saved progress cleared."); }}>Clear</button></div>
+                <div className="row-between"><h2>Saved Work</h2><button className="text-button compact-button" onClick={async () => {
+                  if (!user) return;
+                  const unsyncedCount = records.filter((record) => !record.syncedAt).length;
+                  const message = unsyncedCount
+                    ? `This permanently deletes ${unsyncedCount} unsynced record${unsyncedCount === 1 ? "" : "s"} that never reached the server - that work cannot be recovered. Already-submitted (synced) work will simply reappear next sync, since only a teacher's Reset Progress can actually undo it. Continue?`
+                    : "This clears this device's local cache. Already-submitted (synced) work will reappear on next sync - only a teacher's Reset Progress can actually undo it. Continue?";
+                  if (!window.confirm(message)) return;
+                  await recordSession.current?.clear();
+                  showToast("Local cache cleared.");
+                }}>Clear Cache</button></div>
+                <p className="muted">Clears this device's cache only. Already-submitted work stays locked until your teacher resets it.</p>
                 <div className="records-list">
                   {records.length ? records.slice().reverse().map((record) => <article className="record-card" key={record.id}><small>{record.role} / {record.module} / {record.stage} / {new Date(record.createdAt).toLocaleString()} {record.syncedAt ? "/ synced" : "/ offline"}</small><p>{record.text}</p></article>) : <p className="muted">No saved progress on this device yet.</p>}
                 </div>
