@@ -29,7 +29,12 @@ self.addEventListener("fetch", event => {
   // Never cache authenticated API responses or unrelated external resources.
   if (event.request.method !== "GET" || url.origin !== self.location.origin ||
       url.pathname === "/api" || url.pathname.startsWith("/api/")) return;
-  const asset = event.request.mode === "navigate" ? "/index.html" : url.pathname;
+  // A navigation-mode request covers both "the SPA route the app should
+  // render" and "the user opened a real static file (e.g. the marker image)
+  // in a new tab" - the browser uses the same request mode for both. Only
+  // fall back to the app shell when the path isn't itself a known asset.
+  const isSpaRoute = event.request.mode === "navigate" && !ASSETS.includes(url.pathname);
+  const asset = isSpaRoute ? "/index.html" : url.pathname;
   if (!ASSETS.includes(asset)) return;
   // Keep HTML and its hashed imports from the same fully downloaded build.
   event.respondWith(caches.open(CACHE_NAME).then(async cache =>
