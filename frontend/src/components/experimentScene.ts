@@ -332,7 +332,7 @@ export function createExperimentScene(root: THREE.Group, id: string) {
   } else if (id === "seismic") {
     // Each hammer strike sends a pulse through the rock. P-pulses are fast and push-pull, S-pulses are slower and sideways,
     // and a station on the rock records when the pulse arrives (the delay grows with distance).
-    const X0 = -2.4; const PERIOD = 5.5;
+    const X0 = -2.4;
     const medium = mesh(new THREE.BoxGeometry(4.8, 1.5, 0.12), 0x6b5443, 0, 0, -0.2, root, { roughness: 0.7 });
     const fronts = [0, 1].map(() => mesh(new THREE.PlaneGeometry(0.16, 1.5), 0xffffff, 0, 0, -0.12, root, { opacity: 0.22, emissive: 0xffffff, emissiveIntensity: 0.4 }));
     const particles = Array.from({ length: 36 }, (_, i) => sphere(0xffd454, -2.1 + (i % 12) * 0.38, -0.45 + Math.floor(i / 12) * 0.45, 0.06, root, { emissive: 0xffa000, emissiveIntensity: 0.5 }));
@@ -346,7 +346,7 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     const hammer = new THREE.Group(); hammer.position.set(-2.55, 0.85, 0); root.add(hammer);
     mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.7, 8), 0x8a6a4a, 0, -0.35, 0, hammer);
     mesh(new THREE.BoxGeometry(0.3, 0.22, 0.22), 0x59636e, 0, -0.72, 0, hammer, { metalness: 0.8, roughness: 0.3 });
-    const hammerGrab = new THREE.Mesh(new THREE.BoxGeometry(0.55, 1.0, 0.5), new THREE.MeshBasicMaterial()); hammerGrab.visible = false; hammerGrab.position.set(0, -0.45, 0); hammer.add(hammerGrab);
+    const hammerGrab = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.4, 0.6), new THREE.MeshBasicMaterial()); hammerGrab.visible = false; hammerGrab.position.set(0, -0.45, 0); hammer.add(hammerGrab);
     const station = new THREE.Group(); root.add(station);
     const marker = mesh(new THREE.ConeGeometry(0.2, 0.4, 3), 0xff8a3d, 0, 0, 0, station, { emissive: 0xff6a00, emissiveIntensity: 0.5 }); marker.rotation.z = Math.PI;
     const stationGrab = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.7, 0.5), new THREE.MeshBasicMaterial()); stationGrab.visible = false; station.add(stationGrab);
@@ -362,11 +362,12 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     line([[-2.3, -1.8, -0.04], [2.3, -1.8, -0.04]], 0x2c4a63);
 
     const strikes: { t: number; amp: number }[] = [];
-    let lastTime = -1; let stationX = 1.9;
+    let lastTime = -1; let stationX = 1.9; let autoOn = true;
+    const autoLabel = label("Auto strike: ON", -1.6, 2.02, 2.4, root, 7);
     const held = { name: "", angle: 0 };
     const swing = { start: -10, from: 0 };
     interact = {
-      targets: { hammer, station, rock: medium, waves: wave.sprite },
+      targets: { hammer, station, rock: medium, waves: wave.sprite, auto: autoLabel.sprite },
       down: name => { held.name = name === "hammer" || name === "station" ? name : ""; held.angle = 0; },
       move: (name, point) => {
         if (name === "hammer") held.angle = Math.max(-1.25, Math.min(0, Math.atan2(point.x - hammer.position.x, -(point.y - hammer.position.y))));
@@ -376,15 +377,18 @@ export function createExperimentScene(root: THREE.Group, id: string) {
         if (name === "hammer") { const pull = moved < 8 ? 0.6 : Math.abs(held.angle); strikes.push({ t: lastTime + 0.12, amp: 0.5 + 0.8 * Math.min(1, pull / 1.2) }); swing.start = lastTime; swing.from = Math.max(0.5, pull); }
         else if (name === "rock" && moved < 8) api.setControl("b", 1 - api.values().b);
         else if (name === "waves" && moved < 8) api.setControl("a", 1 - api.values().a);
+        else if (name === "auto" && moved < 8) autoOn = !autoOn;
         held.name = "";
       },
       cancel: () => { held.name = ""; },
     };
     updates.push((time, a, b) => {
+      const PERIOD = a ? 3.6 : 2.2;
+      autoLabel.set(autoOn ? "Auto strike: ON" : "Auto strike: OFF");
       if (time < lastTime - 0.01 || !strikes.length) { strikes.length = 0; strikes.push({ t: 0.6, amp: 1 }); }
       lastTime = time;
       const newest = strikes[strikes.length - 1];
-      if (time > newest.t + PERIOD) { strikes.push({ t: newest.t + PERIOD, amp: 1 }); if (strikes.length > 3) strikes.shift(); }
+      if (autoOn && time > newest.t + PERIOD) { strikes.push({ t: newest.t + PERIOD, amp: 1 }); if (strikes.length > 3) strikes.shift(); }
       const blocked = Boolean(a && b);
       const freq = a ? 4 : 7; const speed = freq / 4;
       const field = (x: number, t: number) => strikes.reduce((sum, hit) => {
@@ -409,11 +413,11 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       const recent = strikes[strikes.length - 1]; const spark = time - recent.t;
       for (let i = 0; i < 10; i++) { if (spark < 0 || spark > 0.5) { sparks.hide(i); continue; } const ang = (i / 10) * Math.PI - Math.PI / 2; sparks.place(i, X0 + 0.05 + Math.cos(ang) * spark * 0.9, Math.sin(ang) * spark * 1.1, 0.12, 1 - spark / 0.5); }
       // Hammer: follows the finger while held, swings after release, and otherwise winds up just before each automatic strike.
-      const nextAuto = recent.t + PERIOD; const wind = (time - (nextAuto - 0.8)) / 0.7;
+      const nextAuto = autoOn ? recent.t + PERIOD : Infinity; const wind = (time - (nextAuto - 0.8)) / 0.7;
       hammer.rotation.z = held.name === "hammer" ? held.angle : time - swing.start < 0.12 ? -swing.from * (1 - (time - swing.start) / 0.12) : wind > 0 && wind < 1 ? -0.9 * wind : 0;
       station.position.set(stationX, 0.98, 0.1);
       const arrival = (stationX - X0) / speed;
-      readout.set(blocked ? "No S-wave reaches the station" : `Station ${(stationX - X0).toFixed(1)} away · pulse arrives after ${arrival.toFixed(1)} s`);
+      readout.set(held.name === "hammer" ? `Pull back, then let go · power ${Math.round(Math.abs(held.angle) / 1.25 * 100)}%` : blocked ? "No S-wave reaches the station" : `Station ${(stationX - X0).toFixed(1)} away · pulse arrives after ${arrival.toFixed(1)} s`);
       for (let j = 0; j < 80; j++) traceValues[j * 3 + 1] = -1.8 + Math.max(-0.36, Math.min(0.36, field(stationX, time - (79 - j) * 0.03) * 1.7));
       traceAttribute.needsUpdate = true;
     });
@@ -457,13 +461,51 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     const air = mesh(new THREE.SphereGeometry(R * 1.06, 40, 28), 0x6fb7ff, 0, 0, 0, globe, { opacity: 0.22, emissive: 0x3d8bff, emissiveIntensity: 0.5 }); air.material.side = THREE.BackSide;
     const caption = label("", 0, 2.3, 5.4);
 
-    // Surface-detail view: a slab of the top 350 km, drawn as a 3D block.
-    const detail = new THREE.Group(); root.add(detail);
-    const depths = [0, 35, 100, 350];
-    for (let i = 0; i < 3; i++) { const top = 1.5 - depths[i] / 100; const bottom = 1.5 - depths[i + 1] / 100; mesh(new THREE.BoxGeometry(2.3, top - bottom, 0.7), earthLayers[i].color, -0.9, (top + bottom) / 2, 0, detail, { roughness: 0.65 }); label(`${depths[i]}–${depths[i + 1]} km`, 1.2, (top + bottom) / 2, 2.1, detail); }
-    label("Crust / rigid mantle / asthenosphere", 0, -2.3, 5.2, detail);
+    // Surface-detail view: a 3D slab of the top 350 km with rock textures, depth tags, and brackets for the two ways of naming layers.
+    const detail = new THREE.Group(); detail.rotation.x = 0.28; root.add(detail);
+    const rock = (baseColor: string, accent: string, kind: "grain" | "flow", seedStart: number) => {
+      const canvas = document.createElement("canvas"); canvas.width = 256; canvas.height = 128;
+      const g = canvas.getContext("2d")!; g.fillStyle = baseColor; g.fillRect(0, 0, 256, 128);
+      let seedValue = seedStart; const rnd = () => (seedValue = (seedValue * 16807 + 11) % 2147483647) / 2147483647;
+      g.fillStyle = accent; g.strokeStyle = accent;
+      if (kind === "grain") for (let k = 0; k < 150; k++) { g.globalAlpha = 0.22 + rnd() * 0.35; g.fillRect(rnd() * 256, rnd() * 128, 3 + rnd() * 9, 2 + rnd() * 5); }
+      else for (let row = 0; row < 12; row++) { g.globalAlpha = 0.3; g.lineWidth = 6; g.beginPath(); const y0 = row * 11 + 4; for (let x = 0; x <= 256; x += 8) { const y = y0 + Math.sin(x / 256 * Math.PI * 4 + row) * 6; if (x) g.lineTo(x, y); else g.moveTo(x, y); } g.stroke(); }
+      g.globalAlpha = 1;
+      const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace; texture.wrapS = THREE.RepeatWrapping; return texture;
+    };
+    const H = 3.0 / 350; const SLAB_W = 2.0; const SLAB_D = 1.0; const surfaceY = 1.35;
+    const spans = [[0, 35], [35, 100], [100, 350]];
+    const textures = [rock("#4a8a58", "#24512f", "grain", 3), rock("#35b0aa", "#d5fff8", "grain", 7), rock("#b060c4", "#ffd6ff", "flow", 9)];
+    const blocks = spans.map(([from, to], i) => {
+      const block = mesh(new THREE.BoxGeometry(SLAB_W, (to - from) * H, SLAB_D), 0xffffff, 0, surfaceY - (from + (to - from) / 2) * H, 0, detail, { roughness: 0.85 });
+      block.material.map = textures[i]; return block;
+    });
+    // Ground on top: grass, a mountain with a snow cap, and a few trees.
+    mesh(new THREE.BoxGeometry(SLAB_W, 0.05, SLAB_D), 0x5fae4e, 0, surfaceY + 0.025, 0, detail, { roughness: 0.8 });
+    mesh(new THREE.ConeGeometry(0.34, 0.55, 6), 0x8b8f96, 0.45, surfaceY + 0.33, -0.1, detail, { roughness: 0.9 });
+    mesh(new THREE.ConeGeometry(0.13, 0.17, 6), 0xf4f7fa, 0.45, surfaceY + 0.52, -0.1, detail, { roughness: 0.6 });
+    [[-0.6, 0.15], [-0.35, -0.2], [-0.75, -0.25], [-0.2, 0.25]].forEach(([x, z]) => mesh(new THREE.ConeGeometry(0.1, 0.26, 7), 0x2f7d3c, x, surfaceY + 0.18, z, detail, { roughness: 0.8 }));
+    // Brackets: on the left what the rock is made of, on the right how it behaves.
+    const bracket = (from: number, to: number, x: number, text: string, side: 1 | -1) => {
+      const top = surfaceY - from * H; const bottom = surfaceY - to * H;
+      const finish = { metalness: 0.5, roughness: 0.4 };
+      mesh(new THREE.BoxGeometry(0.05, top - bottom, 0.05), 0xdde6ef, x, (top + bottom) / 2, 0.5, detail, finish);
+      [top, bottom].forEach(y => mesh(new THREE.BoxGeometry(0.2, 0.04, 0.05), 0xdde6ef, x - side * 0.08, y, 0.5, detail, finish));
+      label(text, x + side * 0.85, (top + bottom) / 2, 1.5, detail, 4);
+    };
+    bracket(0, 35, -1.3, "Crust", -1); bracket(35, 350, -1.3, "Mantle", -1);
+    bracket(0, 100, 1.3, "Lithosphere", 1); bracket(100, 350, 1.3, "Asthenosphere", 1);
+    [35, 100, 350].forEach(depth => { const tag = label(`${depth} km`, 0.62, surfaceY - depth * H, 0.85, detail, 4); tag.sprite.position.z = 0.55; });
+    label("Left: what it is made of · Right: how it behaves", 0, -2.2, 5.2, detail, 12);
+    label("Tap a layer to select it", 0, -2.6, 3.2, detail, 10);
+    interact = {
+      targets: { crust: blocks[0], upper: blocks[1], soft: blocks[2] },
+      up: (name, _point, moved, api) => { if (moved < 8) api.setControl("b", name === "crust" ? 0 : name === "upper" ? 1 : 2); },
+    };
     updates.push((time, a, b, lab) => {
       globe.visible = !a; detail.visible = Boolean(a);
+      textures[2].offset.x = (time * 0.05) % 1;
+      blocks.forEach((block, i) => { const on = b === 0 ? i === 0 : b === 1 ? i <= 1 : b === 2 ? i === 2 : false; block.material.emissive.setHex(on ? [0x4a8a58, 0x35b0aa, 0xb060c4][i] : 0); block.material.emissiveIntensity = on ? 0.45 + 0.25 * Math.sin(time * 3) : 0; });
       globe.rotation.y = Math.sin(time * 0.45) * 0.28;
       const complete = lab.layers === 4;
       air.visible = complete; ghost.visible = !complete;

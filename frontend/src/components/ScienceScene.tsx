@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { ViewMode } from "../types/domain";
 import { createExperimentScene, type InteractionApi } from "./experimentScene";
-import type { LabState } from "../lib/experiments";
+import { controls, type LabState } from "../lib/experiments";
 import { loadArToolkit } from "../lib/arjs";
 import { createHandTracker, type HandSample, type HandTracker } from "../lib/handTracking";
 
@@ -209,13 +209,16 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
         finish(event);
       };
       const onCancel = (event: PointerEvent) => { if (!grab) return; interact.cancel?.(); finish(event); };
+      // Once a part is grabbed, stop the browser from turning the drag into a page scroll.
+      const blockScroll = (event: TouchEvent) => { if (grab) event.preventDefault(); };
+      mount.addEventListener("touchmove", blockScroll, { passive: false });
       mount.addEventListener("pointerdown", onDown);
       mount.addEventListener("pointermove", onMove);
       mount.addEventListener("pointerup", onUp);
       mount.addEventListener("pointercancel", onCancel);
       inputCleanup.push(() => {
         mount.removeEventListener("pointerdown", onDown); mount.removeEventListener("pointermove", onMove);
-        mount.removeEventListener("pointerup", onUp); mount.removeEventListener("pointercancel", onCancel);
+        mount.removeEventListener("pointerup", onUp); mount.removeEventListener("pointercancel", onCancel); mount.removeEventListener("touchmove", blockScroll);
       });
     }
 
@@ -265,7 +268,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
         renderFps = Math.round(frames * 1000 / (now - statsAt));
         detectFps = Math.round(detects * 1000 / (now - statsAt));
         frames = 0; detects = 0; statsAt = now;
-        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState} | q${quality} d${detectEvery}${emptyScene ? " empty" : ""} | b14`;
+        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState} | q${quality} d${detectEvery}${emptyScene ? " empty" : ""} | b15`;
       }
     };
 
@@ -351,7 +354,9 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
       };
       const start = valuesRef.current;
       // Sample a few moments so moving parts (cart, bubbles, waves) stay inside the frame.
-      [0, 0.7, 1.4, 2.1].forEach(time => { updateExperiment(time, start.controlA, start.controlB, start.lab); scene.updateMatrixWorld(true); expand(contentRoot); });
+      // Include both ends of the first control (for example globe vs surface detail) so switching views stays in frame.
+      const range = controls[moduleId as keyof typeof controls][0];
+      new Set([start.controlA, range.min, range.max]).forEach(a => [0, 0.7, 1.4, 2.1].forEach(time => { updateExperiment(time, a, start.controlB, start.lab); scene.updateMatrixWorld(true); expand(contentRoot); }));
     }
     const frameScene = () => {
       if (sceneBounds.isEmpty()) return;
