@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { ViewMode } from "../types/domain";
 import { createExperimentScene } from "./experimentScene";
 import type { LabState } from "../lib/experiments";
@@ -39,7 +40,17 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(mount.clientWidth, mount.clientHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
     mount.appendChild(renderer.domElement);
+
+    // A generated studio environment gives metal and glass something to reflect. No image asset needed.
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const room = new RoomEnvironment();
+    const environment = pmrem.fromScene(room, 0.04).texture;
+    room.dispose();
+    scene.environment = environment;
+    scene.environmentIntensity = 0.85;
 
     const trackedRoot = new THREE.Group();
     scene.add(trackedRoot);
@@ -59,9 +70,11 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
     modelRoot.position.y = viewMode === "ar" ? 0.55 : 0;
     presentationRoot.add(modelRoot);
 
-    const light = new THREE.HemisphereLight(0xffffff, 0x24324d, 2.5);
-    scene.add(light);
-    scene.add(new THREE.AmbientLight(0xffffff, 1.4));
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x24324d, 1.1));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+    const keyLight = new THREE.DirectionalLight(0xfff4e0, 2.4);
+    keyLight.position.set(3, 5, 4);
+    scene.add(keyLight);
 
     const billboardRoot = new THREE.Group();
     modelRoot.add(billboardRoot);
@@ -82,6 +95,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
 
     // Hand-tracking spike: enabled with ?hands=1, AR mode only.
     const handsEnabled = viewMode === "ar" && new URLSearchParams(window.location.search).has("hands");
+    const fpsEnabled = viewMode === "ar" && new URLSearchParams(window.location.search).has("fps");
     let handTracker: HandTracker | null = null;
     let handVideo: HTMLVideoElement | null = null;
     let handHud: HTMLDivElement | null = null;
@@ -125,7 +139,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
         renderFps = Math.round(frames * 1000 / (now - statsAt));
         detectFps = Math.round(detects * 1000 / (now - statsAt));
         frames = 0; detects = 0; statsAt = now;
-        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState} | b3`;
+        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState} | b4`;
       }
     };
 
@@ -140,6 +154,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
       handText.textContent = handState;
       handHud.append(handDot, handText);
       mount!.appendChild(handHud);
+      if (!handsEnabled) { handState = "fps only"; return; }
       const preferred = new URLSearchParams(window.location.search).get("hands")?.toLowerCase() === "cpu" ? "CPU" : "GPU";
       createHandTracker(preferred).then(tracker => {
         if (cancelled) { tracker.close(); return; }
@@ -150,7 +165,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
 
     const render = () => {
       const now = performance.now();
-      if (handsEnabled) tickHands(now);
+      if (handsEnabled || fpsEnabled) tickHands(now);
       const current = valuesRef.current;
       const inputs = JSON.stringify(current);
       if (inputs !== previousInputs) { elapsed = 0; previousInputs = inputs; }
@@ -249,7 +264,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
               void video.play().catch(() => {
                 if (!cancelled) onArStatus?.("Camera playback paused. Switch to 3D and reopen the camera.");
               });
-              if (handsEnabled) startHands(video);
+              if (handsEnabled || fpsEnabled) startHands(video);
               context.init(() => {
                 if (cancelled) { context.dispose?.(); return; }
                 const controller = context.arController!;
@@ -331,6 +346,8 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
       });
       geometries.forEach(geometry => geometry.dispose());
       materials.forEach(mat => { const map = (mat as THREE.MeshBasicMaterial).map; map?.dispose(); mat.dispose(); });
+      environment.dispose();
+      pmrem.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     };
