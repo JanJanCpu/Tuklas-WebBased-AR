@@ -4,6 +4,7 @@ import type { ViewMode } from "../types/domain";
 import { createExperimentScene } from "./experimentScene";
 import type { LabState } from "../lib/experiments";
 import { loadArToolkit } from "../lib/arjs";
+import { createHandTracker, type HandSample, type HandTracker } from "../lib/handTracking";
 
 interface ScienceSceneProps {
   moduleId: string;
@@ -19,6 +20,7 @@ interface ScienceSceneProps {
 
 const cameraParametersUrl = "/assets/camera_para.dat";
 const tuklasMarkerUrl = "/assets/tuklas-marker.patt";
+const HAND_INTERVAL_MS = 66;
 
 export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, viewMode, onArReady, onArStatus, onMarkerChange }: ScienceSceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -77,8 +79,67 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
     let hasStablePose = false;
     let missedFrames = 0;
 
+    // Hand-tracking spike: enabled with ?hands=1, AR mode only.
+    const handsEnabled = viewMode === "ar" && new URLSearchParams(window.location.search).has("hands");
+    let handTracker: HandTracker | null = null;
+    let handVideo: HTMLVideoElement | null = null;
+    let handHud: HTMLDivElement | null = null;
+    let handDot: HTMLDivElement | null = null;
+    let handText: HTMLDivElement | null = null;
+    let handState = "loading hand model...";
+    let lastDetectAt = 0;
+    let statsAt = performance.now();
+    let frames = 0;
+    let detects = 0;
+    let renderFps = 0;
+    let detectFps = 0;
+
+    const showHandSample = (sample: HandSample | null) => {
+      if (!handDot) return;
+      if (!sample) { handDot.style.display = "none"; handState = "no hand"; return; }
+      handDot.style.display = "block";
+      handDot.style.left = `${sample.x * 100}%`;
+      handDot.style.top = `${sample.y * 100}%`;
+      handDot.style.background = sample.pinching ? "#22c55e" : "#ffffff";
+      handState = `${sample.pinching ? "GRAB" : "open"} (pinch ${sample.pinchRatio.toFixed(2)})`;
+    };
+
+    const tickHands = (now: number) => {
+      frames += 1;
+      if (handTracker && handVideo && handVideo.readyState >= 2 && now - lastDetectAt >= HAND_INTERVAL_MS) {
+        lastDetectAt = now;
+        const sample = handTracker.detect(handVideo, now);
+        if (sample !== undefined) { detects += 1; showHandSample(sample); }
+      }
+      if (now - statsAt >= 1000) {
+        renderFps = Math.round(frames * 1000 / (now - statsAt));
+        detectFps = Math.round(detects * 1000 / (now - statsAt));
+        frames = 0; detects = 0; statsAt = now;
+        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${handState}`;
+      }
+    };
+
+    function startHands(video: HTMLVideoElement) {
+      handVideo = video;
+      handHud = document.createElement("div");
+      handHud.style.cssText = "position:absolute;inset:0;z-index:5;pointer-events:none;";
+      handDot = document.createElement("div");
+      handDot.style.cssText = "position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;border:3px solid #0f4c9a;display:none;";
+      handText = document.createElement("div");
+      handText.style.cssText = "position:absolute;left:8px;top:8px;padding:4px 8px;border-radius:6px;background:rgba(0,0,0,.65);color:#fff;font:12px/1.3 monospace;";
+      handText.textContent = handState;
+      handHud.append(handDot, handText);
+      mount!.appendChild(handHud);
+      createHandTracker().then(tracker => {
+        if (cancelled) { tracker.close(); return; }
+        handTracker = tracker;
+        handState = "no hand";
+      }).catch(() => { handState = "hand model failed to load"; });
+    }
+
     const render = () => {
       const now = performance.now();
+      if (handsEnabled) tickHands(now);
       const current = valuesRef.current;
       const inputs = JSON.stringify(current);
       if (inputs !== previousInputs) { elapsed = 0; previousInputs = inputs; }
@@ -177,6 +238,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
               void video.play().catch(() => {
                 if (!cancelled) onArStatus?.("Camera playback paused. Switch to 3D and reopen the camera.");
               });
+              if (handsEnabled) startHands(video);
               context.init(() => {
                 if (cancelled) { context.dispose?.(); return; }
                 const controller = context.arController!;
@@ -241,6 +303,8 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
       window.removeEventListener("resize", resize);
       resizeObserver.disconnect();
       onMarkerChange?.(false);
+      handTracker?.close();
+      handHud?.remove();
       stopCamera();
       if (arContext?.arController) {
         const context = arContext;
