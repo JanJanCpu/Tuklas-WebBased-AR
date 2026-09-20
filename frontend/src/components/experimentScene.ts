@@ -365,12 +365,14 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     let lastTime = -1; let stationX = 1.9; let autoOn = true;
     const autoLabel = label("Auto strike: ON", -1.6, 2.02, 2.4, root, 7);
     const held = { name: "", angle: 0 };
+    const grabStart = new THREE.Vector3();
     const swing = { start: -10, from: 0 };
     interact = {
       targets: { hammer, station, rock: medium, waves: wave.sprite, auto: autoLabel.sprite },
-      down: name => { held.name = name === "hammer" || name === "station" ? name : ""; held.angle = 0; },
+      down: (name, point) => { held.name = name === "hammer" || name === "station" ? name : ""; held.angle = 0; grabStart.copy(point); },
       move: (name, point) => {
-        if (name === "hammer") held.angle = Math.max(-1.25, Math.min(0, Math.atan2(point.x - hammer.position.x, -(point.y - hammer.position.y))));
+        // Pulling left, or down and left, from wherever you grabbed it winds the hammer back.
+        if (name === "hammer") held.angle = -1.25 * Math.max(0, Math.min(1, ((grabStart.x - point.x) + 0.5 * (grabStart.y - point.y)) / 0.9));
         else if (name === "station") stationX = Math.max(-1.7, Math.min(2.1, point.x));
       },
       up: (name, _point, moved, api) => {

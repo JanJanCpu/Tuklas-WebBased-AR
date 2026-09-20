@@ -224,7 +224,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
 
     // Hand-tracking spike: enabled with ?hands=1, AR mode only.
     const handsEnabled = viewMode === "ar" && new URLSearchParams(window.location.search).has("hands");
-    const fpsEnabled = viewMode === "ar" && new URLSearchParams(window.location.search).has("fps");
+    const fpsEnabled = new URLSearchParams(window.location.search).has("fps");
     let handTracker: HandTracker | null = null;
     let handVideo: HTMLVideoElement | null = null;
     let handHud: HTMLDivElement | null = null;
@@ -268,11 +268,11 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
         renderFps = Math.round(frames * 1000 / (now - statsAt));
         detectFps = Math.round(detects * 1000 / (now - statsAt));
         frames = 0; detects = 0; statsAt = now;
-        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState} | q${quality} d${detectEvery}${emptyScene ? " empty" : ""} | b15`;
+        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState} | q${quality} d${detectEvery}${emptyScene ? " empty" : ""} | b16`;
       }
     };
 
-    function startHands(video: HTMLVideoElement) {
+    function startHands(video: HTMLVideoElement | null) {
       handVideo = video;
       handHud = document.createElement("div");
       handHud.style.cssText = "position:absolute;inset:0;z-index:5;pointer-events:none;";
@@ -291,6 +291,8 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
         handState = "no hand";
       }).catch(() => { handState = "hand model failed to load"; });
     }
+
+    if (fpsEnabled && viewMode === "fallback") startHands(null);
 
     const render = () => {
       const now = performance.now();

@@ -19,7 +19,8 @@ function offlineBundle() {
         for (const entry of await readdir(directory, { withFileTypes: true })) {
           const path = resolve(directory, entry.name);
           if (entry.isDirectory()) await walk(path);
-          else if (entry.name !== "service-worker.js") files.push(path);
+          // The hand-tracking model is large and optional; caching it would make every app update a 30 MB download.
+          else if (entry.name !== "service-worker.js" && !relative(outDir, path).startsWith("mediapipe")) files.push(path);
         }
       }
       await walk(outDir);
