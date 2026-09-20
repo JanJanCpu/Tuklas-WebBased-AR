@@ -10,6 +10,7 @@ export interface HandSample {
 }
 
 export interface HandTracker {
+  delegate: "GPU" | "CPU";
   /** undefined = no new video frame, null = frame processed but no hand visible. */
   detect(video: HTMLVideoElement, timestampMs: number): HandSample | null | undefined;
   close(): void;
@@ -29,9 +30,11 @@ export async function createHandTracker(): Promise<HandTracker> {
     numHands: 1,
   });
   let landmarker: HandLandmarker;
+  let delegate: "GPU" | "CPU" = "GPU";
   try {
     landmarker = await HandLandmarker.createFromOptions(vision, options("GPU"));
   } catch {
+    delegate = "CPU";
     landmarker = await HandLandmarker.createFromOptions(vision, options("CPU"));
   }
 
@@ -39,6 +42,7 @@ export async function createHandTracker(): Promise<HandTracker> {
   let lastVideoTime = -1;
 
   return {
+    delegate,
     detect(video, timestampMs) {
       // MediaPipe rejects repeated timestamps and there is nothing new to see on a repeated frame.
       if (video.currentTime === lastVideoTime) return undefined;

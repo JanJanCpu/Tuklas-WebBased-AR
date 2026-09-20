@@ -93,6 +93,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
     let detects = 0;
     let renderFps = 0;
     let detectFps = 0;
+    let detectMs = 0;
 
     const showHandSample = (sample: HandSample | null) => {
       if (!handDot) return;
@@ -109,13 +110,17 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
       if (handTracker && handVideo && handVideo.readyState >= 2 && now - lastDetectAt >= HAND_INTERVAL_MS) {
         lastDetectAt = now;
         const sample = handTracker.detect(handVideo, now);
-        if (sample !== undefined) { detects += 1; showHandSample(sample); }
+        if (sample !== undefined) {
+          detects += 1;
+          detectMs = detectMs * 0.8 + (performance.now() - now) * 0.2;
+          showHandSample(sample);
+        }
       }
       if (now - statsAt >= 1000) {
         renderFps = Math.round(frames * 1000 / (now - statsAt));
         detectFps = Math.round(detects * 1000 / (now - statsAt));
         frames = 0; detects = 0; statsAt = now;
-        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${handState}`;
+        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState}`;
       }
     };
 
