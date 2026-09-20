@@ -195,24 +195,32 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       forceLabel.set(drag.target === "cart" ? `Push: v₀ = ${drag.value} m/s` : drag.target === "arrow" ? `Force = ${a} N` : id === "launcher" ? `Equal forces: ${a} N each` : `a = ${acceleration.toFixed(2)} m/s²`);
     });
   } else if (["series", "parallel", "home-circuit"].includes(id)) {
-    mesh(new RoundedBoxGeometry(5.6, 3.5, 0.1, 3, 0.05), 0x1d3557, 0, 0.32, -0.2, root, { roughness: 0.8 });
+    mesh(new RoundedBoxGeometry(5.6, 3.7, 0.1, 3, 0.05), 0x1d3557, 0, 0.4, -0.2, root, { roughness: 0.8 });
     const wiring = new THREE.Group(); root.add(wiring);
-    const bulbs = [0, 1, 2].map(i => sphere(0xf5d357, -1.5 + i * 1.5, 0.6, 0.27, root, { roughness: 0.15 }));
-    const bulbGlows = bulbs.map(bulb => glow(0xffc84a, 1.9, bulb));
-    // Each bulb sits in a holder: screw base on the left, contact tip on the right, brass terminals, brackets and a stand.
-    bulbs.forEach(bulb => {
+    const ROW = 0.15;                    // height of the top wire in the series layout
+    const LIFT = 0.64;                   // how far the glass sits above the terminals
+    const PARALLEL_SCALE = 0.68;         // bulbs are drawn smaller when three sit above each other
+    const units = [0, 1, 2].map(i => { const unit = new THREE.Group(); unit.position.set(-1.5 + i * 1.5, ROW, 0); root.add(unit); return unit; });
+    const glass = units.map(unit => sphere(0xf5d357, 0, LIFT, 0.27, unit, { roughness: 0.15 }));
+    const bulbGlows = glass.map(bulb => glow(0xffc84a, 1.9, bulb));
+    // Each bulb screws into a round white lamp holder (base with screw holes, raised collar, brass thread) with a terminal on each side.
+    units.forEach(unit => {
       const brass = { metalness: 0.85, roughness: 0.3 };
-      const base = mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.3, 16), 0xb08d3c, -0.33, 0, 0, bulb, brass); base.rotation.z = Math.PI / 2;
-      [-0.22, -0.33, -0.44].forEach(x => { const thread = mesh(new THREE.TorusGeometry(0.12, 0.012, 6, 16), 0x8a6e2c, x, 0, 0, bulb, brass); thread.rotation.y = Math.PI / 2; });
-      const tip = mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.16, 10), 0xd3dae2, 0.33, 0, 0, bulb, brass); tip.rotation.z = Math.PI / 2;
+      const white = { roughness: 0.45 };
+      mesh(new THREE.CylinderGeometry(0.42, 0.44, 0.07, 32), 0xf3f3ef, 0, -0.02, 0, unit, white);
+      [-0.3, 0.3].forEach(x => mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.012, 10), 0x59636e, x, 0.02, 0.13, unit, brass));
+      mesh(new THREE.CylinderGeometry(0.26, 0.3, 0.2, 28), 0xf3f3ef, 0, 0.115, 0, unit, white);
+      const ring = mesh(new THREE.TorusGeometry(0.225, 0.028, 8, 28), 0xb08d3c, 0, 0.216, 0, unit, brass); ring.rotation.x = Math.PI / 2;
+      const holderScrew = mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.03, 10), 0xb08d3c, 0, 0.11, 0.3, unit, brass); holderScrew.rotation.x = Math.PI / 2;
+      mesh(new THREE.CylinderGeometry(0.15, 0.17, 0.2, 20), 0xb08d3c, 0, 0.29, 0, unit, brass);
+      [0.25, 0.3, 0.35].forEach(y => { const thread = mesh(new THREE.TorusGeometry(0.16, 0.012, 6, 20), 0x8a6e2c, 0, y, 0, unit, brass); thread.rotation.x = Math.PI / 2; });
       [-0.5, 0.5].forEach(x => {
-        const nut = mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.16, 12), 0xd9b34a, x, 0, 0, bulb, brass); nut.rotation.x = Math.PI / 2;
-        const screw = mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.05, 8), 0x59636e, x, 0, 0.09, bulb, brass); screw.rotation.x = Math.PI / 2;
-        mesh(new THREE.BoxGeometry(0.09, 0.28, 0.09), 0x59636e, x, -0.19, 0, bulb, brass);
+        mesh(new THREE.BoxGeometry(0.1, 0.05, 0.18), 0xc7ced6, x * 0.92, -0.02, 0, unit, brass);
+        const nut = mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.16, 12), 0xd9b34a, x, 0, 0, unit, brass); nut.rotation.x = Math.PI / 2;
+        const screw = mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.05, 8), 0x59636e, x, 0, 0.09, unit, brass); screw.rotation.x = Math.PI / 2;
       });
-      mesh(new RoundedBoxGeometry(1.1, 0.09, 0.34, 2, 0.03), 0x2b3442, 0, -0.36, -0.04, bulb, { roughness: 0.6 });
     });
-    const bulbLabels = bulbs.map((_, i) => label(`Bulb ${i + 1}`, -1.5 + i * 1.5, 1.15, 1.25, root, 4));
+    const bulbLabels = units.map((_, i) => label(`Bulb ${i + 1}`, -1.5 + i * 1.5, ROW + 1.1, 1.25, root, 4));
     // Battery holder: a tray with a contact strip and metal end plates. The wires meet the plates, not the cells.
     mesh(new RoundedBoxGeometry(2.0, 0.16, 0.36, 2, 0.04), 0x2b3442, 0, -1.3, 0, root, { roughness: 0.6 });
     mesh(new THREE.BoxGeometry(1.9, 0.02, 0.14), 0xc27c45, 0, -1.215, 0, root, { metalness: 0.8, roughness: 0.3 });
@@ -227,7 +235,7 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.07, 10), 0xd3dae2, 0, 0.29, 0, cell, { metalness: 0.9, roughness: 0.2 });
     });
     const batteryLabel = label("", 0, -1.62, 3);
-    const switchLabel = label("", 0, 1.7, 4);
+    const switchLabel = label("", 0, 1.85, 4);
     const electrons = instanced(new THREE.SphereGeometry(0.065, 8, 6), 0x00a7e6, 24, root, { emissive: 0x00a7e6, emissiveIntensity: 1.4, roughness: 0.3 });
     const electronAt = new THREE.Vector3();
     let signature = "";
@@ -240,20 +248,22 @@ export function createExperimentScene(root: THREE.Group, id: string) {
         signature = next;
         wiring.traverse(object => { const item = object as THREE.Mesh; if (item.geometry) { item.geometry.dispose(); (item.material as THREE.Material).dispose(); } }); wiring.clear(); paths = [];
         if (c.parallel) {
-          wire([[-2.2, -1.15], [-2.2, 0.8]], wiring); wire([[2.2, -1.15], [2.2, 0.8]], wiring);
-          for (let i = 0; i < 3; i++) { const y = 0.8 - i * 0.65; bulbs[i].position.set(0.8, y, 0); bulbLabels[i].sprite.position.set(1.85, y + 0.2, 0.18); if (lab.branchMask & (1 << i)) { const points = [[0, -1.15], [-2.2, -1.15], [-2.2, y], [2.2, y], [2.2, -1.15], [0, -1.15]]; wire(points, wiring, [{ y: -1.15, x0: -1.0, x1: 1.0 }, { y, x0: 0.3, x1: 1.3 }]); paths.push(points.map(p => new THREE.Vector3(p[0], p[1], 0))); } }
+          wire([[-2.2, -1.15], [-2.2, 1.0]], wiring); wire([[2.2, -1.15], [2.2, 1.0]], wiring);
+          const half = 0.5 * PARALLEL_SCALE;
+          for (let i = 0; i < 3; i++) { const y = 1.0 - i * 0.75; units[i].position.set(0.8, y, 0); units[i].scale.setScalar(PARALLEL_SCALE); bulbLabels[i].sprite.position.set(1.85, y + 0.2, 0.18); if (lab.branchMask & (1 << i)) { const points = [[0, -1.15], [-2.2, -1.15], [-2.2, y], [2.2, y], [2.2, -1.15], [0, -1.15]]; wire(points, wiring, [{ y: -1.15, x0: -1.0, x1: 1.0 }, { y, x0: 0.8 - half, x1: 0.8 + half }]); paths.push(points.map(p => new THREE.Vector3(p[0], p[1], 0))); } }
         } else {
-          const points = [[0, -1.15], [-2.2, -1.15], [-2.2, 0.6], [2.2, 0.6], [2.2, -1.15], [0, -1.15]]; wire(points, wiring, [{ y: -1.15, x0: -1.0, x1: 1.0 }, ...[0, 1, 2].filter(installedBulb).map(i => ({ y: 0.6, x0: -1.5 + i * 1.5 - 0.5, x1: -1.5 + i * 1.5 + 0.5 }))]); paths = [points.map(p => new THREE.Vector3(p[0], p[1], 0))];
-          bulbs.forEach((bulb, i) => { bulb.position.set(-1.5 + i * 1.5, 0.6, 0); bulbLabels[i].sprite.position.set(-1.5 + i * 1.5, 1.05, 0.18); });
+          const points = [[0, -1.15], [-2.2, -1.15], [-2.2, ROW], [2.2, ROW], [2.2, -1.15], [0, -1.15]]; wire(points, wiring, [{ y: -1.15, x0: -1.0, x1: 1.0 }, ...[0, 1, 2].filter(installedBulb).map(i => ({ y: ROW, x0: -1.5 + i * 1.5 - 0.5, x1: -1.5 + i * 1.5 + 0.5 }))]); paths = [points.map(p => new THREE.Vector3(p[0], p[1], 0))];
+          units.forEach((unit, i) => { unit.position.set(-1.5 + i * 1.5, ROW, 0); unit.scale.setScalar(1); bulbLabels[i].sprite.position.set(-1.5 + i * 1.5, ROW + 1.1, 0.18); });
         }
       }
       batteries.forEach((battery, i) => { battery.visible = i < (id === "home-circuit" ? b : a); battery.material.color.setHex(c.tripped ? 0xd63242 : 0x344a65); });
       batteryLabel.set(`${c.voltage} V · ${c.current.toFixed(2)} A total`);
       switchLabel.set(c.tripped ? "Fuse OPEN (> 1.5 A)" : lab.closed ? "Switch CLOSED" : "Switch OPEN");
-      bulbs.forEach((bulb, i) => {
-        const installed = id === "series" ? i < b : Boolean(lab.branchMask & (1 << i));
+      units.forEach((unit, i) => {
+        const installed = installedBulb(i);
         const brightness = c.current > 0 && installed ? Math.min(2, c.power / 1.7) : 0;
-        bulb.visible = installed; bulbLabels[i].sprite.visible = installed;
+        const bulb = glass[i];
+        unit.visible = installed; bulbLabels[i].sprite.visible = installed;
         bulb.material.emissive.setHex(0xffb000); bulb.material.emissiveIntensity = brightness;
         bulb.material.color.setHex(c.current > 0 ? 0xffd657 : 0x617183);
         bulbGlows[i].material.opacity = Math.min(0.85, brightness * 0.45) * (0.92 + 0.08 * Math.sin(time * 9 + i));
