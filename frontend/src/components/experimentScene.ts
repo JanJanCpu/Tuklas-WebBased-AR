@@ -201,10 +201,11 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     const LIFT = 0.64;                   // how far the glass sits above the terminals
     const PARALLEL_SCALE = 0.68;         // bulbs are drawn smaller when three sit above each other
     const units = [0, 1, 2].map(i => { const unit = new THREE.Group(); unit.position.set(-1.5 + i * 1.5, ROW, 0); root.add(unit); return unit; });
-    const glass = units.map(unit => sphere(0xf5d357, 0, LIFT, 0.27, unit, { roughness: 0.15 }));
+    const bodies = units.map(unit => { const body = new THREE.Group(); unit.add(body); return body; });
+    const glass = bodies.map(body => sphere(0xf5d357, 0, LIFT, 0.27, body, { roughness: 0.15 }));
     const bulbGlows = glass.map(bulb => glow(0xffc84a, 1.9, bulb));
     // Each bulb screws into a round white lamp holder (base with screw holes, raised collar, brass thread) with a terminal on each side.
-    units.forEach(unit => {
+    units.forEach((unit, unitIndex) => {
       const brass = { metalness: 0.85, roughness: 0.3 };
       const white = { roughness: 0.45 };
       mesh(new THREE.CylinderGeometry(0.42, 0.44, 0.07, 32), 0xf3f3ef, 0, -0.02, 0, unit, white);
@@ -212,8 +213,8 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       mesh(new THREE.CylinderGeometry(0.26, 0.3, 0.2, 28), 0xf3f3ef, 0, 0.115, 0, unit, white);
       const ring = mesh(new THREE.TorusGeometry(0.225, 0.028, 8, 28), 0xb08d3c, 0, 0.216, 0, unit, brass); ring.rotation.x = Math.PI / 2;
       const holderScrew = mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.03, 10), 0xb08d3c, 0, 0.11, 0.3, unit, brass); holderScrew.rotation.x = Math.PI / 2;
-      mesh(new THREE.CylinderGeometry(0.15, 0.17, 0.2, 20), 0xb08d3c, 0, 0.29, 0, unit, brass);
-      [0.25, 0.3, 0.35].forEach(y => { const thread = mesh(new THREE.TorusGeometry(0.16, 0.012, 6, 20), 0x8a6e2c, 0, y, 0, unit, brass); thread.rotation.x = Math.PI / 2; });
+      mesh(new THREE.CylinderGeometry(0.15, 0.17, 0.2, 20), 0xb08d3c, 0, 0.29, 0, bodies[unitIndex], brass);
+      [0.25, 0.3, 0.35].forEach(y => { const thread = mesh(new THREE.TorusGeometry(0.16, 0.012, 6, 20), 0x8a6e2c, 0, y, 0, bodies[unitIndex], brass); thread.rotation.x = Math.PI / 2; });
       [-0.5, 0.5].forEach(x => {
         mesh(new THREE.BoxGeometry(0.1, 0.05, 0.18), 0xc7ced6, x * 0.92, -0.02, 0, unit, brass);
         const nut = mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.16, 12), 0xd9b34a, x, 0, 0, unit, brass); nut.rotation.x = Math.PI / 2;
@@ -234,6 +235,73 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       mesh(new THREE.CylinderGeometry(0.125, 0.125, 0.05, 18), 0xe8b92e, 0, -0.12, 0, cell, { metalness: 0.7, roughness: 0.3 });
       mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.07, 10), 0xd3dae2, 0, 0.29, 0, cell, { metalness: 0.9, roughness: 0.2 });
     });
+    // Switch on the bottom wire: a hinged lever that closes the gap between two terminals.
+    const SW0 = 1.35; const SW1 = 1.85; const SW_Y = -1.15;
+    const brassFinish = { metalness: 0.85, roughness: 0.3 };
+    mesh(new RoundedBoxGeometry(0.7, 0.1, 0.32, 2, 0.03), 0x2b3442, 1.6, -1.28, 0, root, { roughness: 0.6 });
+    [SW0, SW1].forEach(x => { const nut = mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.16, 12), 0xd9b34a, x, SW_Y, 0, root, brassFinish); nut.rotation.x = Math.PI / 2; });
+    const lever = new THREE.Group(); lever.position.set(SW0, SW_Y, 0.1); root.add(lever);
+    mesh(new THREE.BoxGeometry(0.5, 0.05, 0.06), 0xd3dae2, 0.25, 0, 0, lever, brassFinish);
+    mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.16, 10), 0x1c2635, 0.5, 0.06, 0, lever, { roughness: 0.5 });
+    const switchGrab = new THREE.Group(); switchGrab.position.set(1.6, -1.05, 0); root.add(switchGrab);
+    const switchHit = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.9, 0.5), new THREE.MeshBasicMaterial()); switchHit.visible = false; switchGrab.add(switchHit);
+    // Ghosts mark empty slots: tap or drag one to put the part back.
+    const cellHomes = [0, 1, 2].map(i => new THREE.Vector3(-0.6 + i * 0.6, -1.13, 0));
+    const ghostCells = [0, 1, 2].map(i => { const ghost = mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.52, 18), 0x59d6ff, cellHomes[i].x, cellHomes[i].y, 0, root, { opacity: 0.3, emissive: 0x59d6ff, emissiveIntensity: 0.5 }); ghost.rotation.z = -Math.PI / 2; return ghost; });
+    const ghostBulbs = [0, 1, 2].map(() => {
+      const ghost = new THREE.Group(); root.add(ghost);
+      mesh(new THREE.SphereGeometry(0.27, 16, 12), 0xffe9a8, 0, LIFT, 0, ghost, { opacity: 0.3, emissive: 0xffd657, emissiveIntensity: 0.4 });
+      mesh(new THREE.CylinderGeometry(0.15, 0.17, 0.2, 14), 0xb08d3c, 0, 0.29, 0, ghost, { opacity: 0.35 });
+      return ghost;
+    });
+    label("Tap or drag the lever · drag a cell or bulb out · tap its ghost to add it back", 0, -2.05, 5.4, root, 14);
+    const held = { name: "", x: 0, y: 0, dx: 0, dy: 0, angle: 0 };
+    let leverAngle = 0.95;
+    const bodyHome = new THREE.Vector3(0, 0, 0);
+    const batteryKey = id === "home-circuit" ? "b" : "a";
+    const outsideHolder = (point: THREE.Vector3) => Math.abs(point.x) > 1.25 || point.y > -0.8 || point.y < -1.6;
+    const indexOf = (name: string, prefix: string) => Number(name.slice(prefix.length));
+    const installBulb = (i: number, api: InteractionApi) => {
+      if (id === "series") { const { b } = api.values(); if (b < 3) api.setControl("b", b + 1); }
+      else api.setLab({ branchMask: api.values().lab.branchMask | (1 << i) });
+    };
+    const removeBulb = (i: number, api: InteractionApi) => {
+      if (id === "series") { const { b } = api.values(); if (b > 1) api.setControl("b", b - 1); }
+      else api.setLab({ branchMask: api.values().lab.branchMask & ~(1 << i) });
+    };
+    interact = {
+      targets: {
+        switch: switchGrab,
+        ...Object.fromEntries(batteries.map((cell, i) => [`cell${i}`, cell])),
+        ...Object.fromEntries(ghostCells.map((ghost, i) => [`ghostCell${i}`, ghost])),
+        ...Object.fromEntries(bodies.map((body, i) => [`bulb${i}`, body])),
+        ...Object.fromEntries(ghostBulbs.map((ghost, i) => [`ghostBulb${i}`, ghost])),
+      },
+      down: (name, point) => {
+        held.name = name; held.x = point.x; held.y = point.y;
+        if (name === "switch") held.angle = leverAngle;
+        else if (name.startsWith("ghostCell")) { const ghost = ghostCells[indexOf(name, "ghostCell")]; held.dx = ghost.position.x - point.x; held.dy = ghost.position.y - point.y; }
+        else if (name.startsWith("cell")) { const cell = batteries[indexOf(name, "cell")]; held.dx = cell.position.x - point.x; held.dy = cell.position.y - point.y; }
+        else if (name.startsWith("ghostBulb")) { const ghost = ghostBulbs[indexOf(name, "ghostBulb")]; held.dx = ghost.position.x - point.x; held.dy = ghost.position.y - point.y; }
+        else if (name.startsWith("bulb")) { const i = indexOf(name, "bulb"); const size = units[i].scale.x; held.dx = bodies[i].position.x - (point.x - units[i].position.x) / size; held.dy = bodies[i].position.y - (point.y - units[i].position.y) / size; }
+      },
+      move: (name, point) => {
+        held.x = point.x; held.y = point.y;
+        // The lever follows the finger around its hinge.
+        if (name === "switch") held.angle = Math.max(0, Math.min(0.95, Math.atan2(point.y - SW_Y, point.x - SW0)));
+      },
+      up: (name, point, moved, api) => {
+        const { a, b, lab } = api.values();
+        const count = id === "home-circuit" ? b : a;
+        if (name === "switch") api.setLab({ closed: moved < 8 ? !lab.closed : held.angle < 0.45 });
+        else if (name.startsWith("ghostCell")) { if ((moved < 8 || !outsideHolder(point)) && count < 3) api.setControl(batteryKey, count + 1); }
+        else if (name.startsWith("cell")) { if (moved >= 8 && outsideHolder(point) && count > 1) api.setControl(batteryKey, count - 1); }
+        else if (name.startsWith("ghostBulb")) { const i = indexOf(name, "ghostBulb"); if (moved < 8 || Math.hypot(point.x - units[i].position.x, point.y - units[i].position.y - LIFT * units[i].scale.x) < 0.9) installBulb(i, api); }
+        else if (name.startsWith("bulb")) { const i = indexOf(name, "bulb"); if (moved >= 8 && Math.hypot(bodies[i].position.x, bodies[i].position.y) > 0.9) removeBulb(i, api); }
+        held.name = "";
+      },
+      cancel: () => { held.name = ""; },
+    };
     const batteryLabel = label("", 0, -1.62, 3);
     const switchLabel = label("", 0, 1.85, 4);
     const electrons = instanced(new THREE.SphereGeometry(0.065, 8, 6), 0x00a7e6, 24, root, { emissive: 0x00a7e6, emissiveIntensity: 1.4, roughness: 0.3 });
@@ -250,9 +318,9 @@ export function createExperimentScene(root: THREE.Group, id: string) {
         if (c.parallel) {
           wire([[-2.2, -1.15], [-2.2, 1.0]], wiring); wire([[2.2, -1.15], [2.2, 1.0]], wiring);
           const half = 0.5 * PARALLEL_SCALE;
-          for (let i = 0; i < 3; i++) { const y = 1.0 - i * 0.75; units[i].position.set(0.8, y, 0); units[i].scale.setScalar(PARALLEL_SCALE); bulbLabels[i].sprite.position.set(1.85, y + 0.2, 0.18); if (lab.branchMask & (1 << i)) { const points = [[0, -1.15], [-2.2, -1.15], [-2.2, y], [2.2, y], [2.2, -1.15], [0, -1.15]]; wire(points, wiring, [{ y: -1.15, x0: -1.0, x1: 1.0 }, { y, x0: 0.8 - half, x1: 0.8 + half }]); paths.push(points.map(p => new THREE.Vector3(p[0], p[1], 0))); } }
+          for (let i = 0; i < 3; i++) { const y = 1.0 - i * 0.75; units[i].position.set(0.8, y, 0); units[i].scale.setScalar(PARALLEL_SCALE); bulbLabels[i].sprite.position.set(1.85, y + 0.2, 0.18); if (lab.branchMask & (1 << i)) { const points = [[0, -1.15], [-2.2, -1.15], [-2.2, y], [2.2, y], [2.2, -1.15], [0, -1.15]]; wire(points, wiring, [{ y: -1.15, x0: -1.0, x1: 1.0 }, { y: -1.15, x0: SW0, x1: SW1 }, { y, x0: 0.8 - half, x1: 0.8 + half }]); paths.push(points.map(p => new THREE.Vector3(p[0], p[1], 0))); } }
         } else {
-          const points = [[0, -1.15], [-2.2, -1.15], [-2.2, ROW], [2.2, ROW], [2.2, -1.15], [0, -1.15]]; wire(points, wiring, [{ y: -1.15, x0: -1.0, x1: 1.0 }, ...[0, 1, 2].filter(installedBulb).map(i => ({ y: ROW, x0: -1.5 + i * 1.5 - 0.5, x1: -1.5 + i * 1.5 + 0.5 }))]); paths = [points.map(p => new THREE.Vector3(p[0], p[1], 0))];
+          const points = [[0, -1.15], [-2.2, -1.15], [-2.2, ROW], [2.2, ROW], [2.2, -1.15], [0, -1.15]]; wire(points, wiring, [{ y: -1.15, x0: -1.0, x1: 1.0 }, { y: -1.15, x0: SW0, x1: SW1 }, ...[0, 1, 2].filter(installedBulb).map(i => ({ y: ROW, x0: -1.5 + i * 1.5 - 0.5, x1: -1.5 + i * 1.5 + 0.5 }))]); paths = [points.map(p => new THREE.Vector3(p[0], p[1], 0))];
           units.forEach((unit, i) => { unit.position.set(-1.5 + i * 1.5, ROW, 0); unit.scale.setScalar(1); bulbLabels[i].sprite.position.set(-1.5 + i * 1.5, ROW + 1.1, 0.18); });
         }
       }
@@ -267,6 +335,18 @@ export function createExperimentScene(root: THREE.Group, id: string) {
         bulb.material.emissive.setHex(0xffb000); bulb.material.emissiveIntensity = brightness;
         bulb.material.color.setHex(c.current > 0 ? 0xffd657 : 0x617183);
         bulbGlows[i].material.opacity = Math.min(0.85, brightness * 0.45) * (0.92 + 0.08 * Math.sin(time * 9 + i));
+      });
+      // Touch-driven parts: the lever, cells and bulbs follow the finger; ghosts mark empty slots.
+      const count = id === "home-circuit" ? b : a;
+      if (held.name === "switch") leverAngle = held.angle; else leverAngle += ((lab.closed ? 0 : 0.95) - leverAngle) * 0.3;
+      lever.rotation.z = leverAngle;
+      batteries.forEach((cell, i) => { if (held.name === `cell${i}`) cell.position.set(held.x + held.dx, held.y + held.dy, 0.25); else cell.position.lerp(cellHomes[i], 0.3); });
+      ghostCells.forEach((ghost, i) => { ghost.visible = i === count && count < 3; if (held.name === `ghostCell${i}`) ghost.position.set(held.x + held.dx, held.y + held.dy, 0.25); else ghost.position.lerp(cellHomes[i], 0.3); });
+      bodies.forEach((body, i) => { if (held.name === `bulb${i}`) body.position.set((held.x - units[i].position.x) / units[i].scale.x + held.dx, (held.y - units[i].position.y) / units[i].scale.x + held.dy, 0.3); else body.position.lerp(bodyHome, 0.3); });
+      ghostBulbs.forEach((ghost, i) => {
+        ghost.visible = id === "series" ? i === b && b < 3 : !installedBulb(i);
+        if (held.name === `ghostBulb${i}`) { ghost.position.set(held.x + held.dx, held.y + held.dy, 0.3); ghost.scale.setScalar(units[i].scale.x); }
+        else { ghost.position.lerp(units[i].position, 0.3); ghost.scale.copy(units[i].scale); }
       });
       for (let i = 0; i < 24; i++) { if (!(c.current > 0 && paths.length > 0)) { electrons.hide(i); continue; } const path = paths[i % paths.length]; const progress = ((time * c.branchCurrent * 0.45 + i / 24) % 1) * (path.length - 1); const segment = Math.floor(progress); electronAt.copy(path[segment]).lerp(path[segment + 1], progress - segment); electrons.place(i, electronAt.x, electronAt.y, electronAt.z, 1); }
     });
