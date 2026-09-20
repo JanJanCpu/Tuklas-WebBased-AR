@@ -21,6 +21,7 @@ interface ScienceSceneProps {
 const cameraParametersUrl = "/assets/camera_para.dat";
 const tuklasMarkerUrl = "/assets/tuklas-marker.patt";
 const HAND_INTERVAL_MS = 66;
+const HAND_SEARCH_INTERVAL_MS = 250;
 
 export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, viewMode, onArReady, onArStatus, onMarkerChange }: ScienceSceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -94,8 +95,10 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
     let renderFps = 0;
     let detectFps = 0;
     let detectMs = 0;
+    let handPresent = false;
 
     const showHandSample = (sample: HandSample | null) => {
+      handPresent = sample !== null;
       if (!handDot) return;
       if (!sample) { handDot.style.display = "none"; handState = "no hand"; return; }
       handDot.style.display = "block";
@@ -107,7 +110,9 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
 
     const tickHands = (now: number) => {
       frames += 1;
-      if (handTracker && handVideo && handVideo.readyState >= 2 && now - lastDetectAt >= HAND_INTERVAL_MS) {
+      // Keep detection to roughly a third of frame time; search for a hand less often than we track one.
+      const interval = handPresent ? Math.max(HAND_INTERVAL_MS, detectMs * 2) : Math.max(HAND_SEARCH_INTERVAL_MS, detectMs * 3);
+      if (handTracker && handVideo && handVideo.readyState >= 2 && now - lastDetectAt >= interval) {
         lastDetectAt = now;
         const sample = handTracker.detect(handVideo, now);
         if (sample !== undefined) {
