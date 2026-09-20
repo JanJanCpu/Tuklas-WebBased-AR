@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { ViewMode } from "../types/domain";
@@ -30,6 +30,8 @@ const HAND_SEARCH_INTERVAL_MS = 250;
 
 export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, viewMode, onArReady, onArStatus, onMarkerChange, onControlChange, onLabChange }: ScienceSceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
+  // Set once a weak phone has stepped down to the tracking-size level, so the camera is set up again at the smaller size.
+  const [trackingLow, setTrackingLow] = useState(false);
   const valuesRef = useRef({ controlA, controlB, lab, trialPulse });
   valuesRef.current = { controlA, controlB, lab, trialPulse };
   const controlChangeRef = useRef(onControlChange);
@@ -117,6 +119,8 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
     let storedQuality = 0;
     try { storedQuality = Number(localStorage.getItem("tuklas-quality-v2")) || 0; } catch { /* storage unavailable */ }
     applyQuality(Math.min(3, forcedQuality !== null ? Number(forcedQuality) || 0 : storedQuality));
+    // Marker tracking is the main cost on weak phones: analyze a quarter as many pixels from quality level 2.
+    const trackingSize = quality >= 2 || trackingLow ? { w: 320, h: 240 } : { w: 640, h: 480 };
     const watchFrameRate = (now: number) => {
       qFrames += 1;
       const elapsed = now - qStart;
@@ -131,6 +135,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
       lowWindows = 0; qWindows = 0;
       applyQuality(quality + 1);
       try { localStorage.setItem("tuklas-quality-v2", String(quality)); } catch { /* storage unavailable */ }
+      if (quality >= 2 && viewMode === "ar") setTrackingLow(true);
     };
     let elapsed = 0;
     let previousTime = performance.now();
@@ -268,7 +273,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
         renderFps = Math.round(frames * 1000 / (now - statsAt));
         detectFps = Math.round(detects * 1000 / (now - statsAt));
         frames = 0; detects = 0; statsAt = now;
-        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState} | q${quality} d${detectEvery}${emptyScene ? " empty" : ""} | b22`;
+        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState} | q${quality} d${detectEvery} t${trackingSize.w}${emptyScene ? " empty" : ""} | b23`;
       }
     };
 
@@ -408,8 +413,8 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
             cameraParametersUrl,
             detectionMode: "mono",
             patternRatio: 0.5,
-            canvasWidth: 640,
-            canvasHeight: 480,
+            canvasWidth: trackingSize.w,
+            canvasHeight: trackingSize.h,
           });
           arSource = source;
           arContext = context;
@@ -514,7 +519,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, [moduleId, viewMode, onArReady, onArStatus, onMarkerChange]);
+  }, [moduleId, viewMode, trackingLow, onArReady, onArStatus, onMarkerChange]);
 
   return <div className="three-scene" ref={mountRef} aria-hidden="true" />;
 }
