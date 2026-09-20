@@ -50,7 +50,8 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       item.setMatrixAt(index, dummy.matrix); item.instanceMatrix.needsUpdate = true;
     };
     const hide = (index: number) => place(index, 0, 0, 0, 0);
-    return { item, get material() { return item.material as THREE.MeshStandardMaterial; }, place, hide };
+    const tint = (index: number, color: THREE.Color) => { item.setColorAt(index, color); if (item.instanceColor) item.instanceColor.needsUpdate = true; };
+    return { item, get material() { return item.material as THREE.MeshStandardMaterial; }, place, hide, tint };
   };
   const line = (points: number[][], color = 0x486480, parent: THREE.Object3D = root) => {
     const item = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points.map(p => new THREE.Vector3(p[0], p[1], p[2] || 0))), new THREE.LineBasicMaterial({ color })); parent.add(item); return item;
@@ -335,10 +336,11 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     const X0 = -2.4;
     const medium = mesh(new THREE.BoxGeometry(4.8, 1.5, 0.12), 0x6b5443, 0, 0, -0.2, root, { roughness: 0.7 });
     const fronts = [0, 1].map(() => mesh(new THREE.PlaneGeometry(0.16, 1.5), 0xffffff, 0, 0, -0.12, root, { opacity: 0.22, emissive: 0xffffff, emissiveIntensity: 0.4 }));
-    const particles = Array.from({ length: 36 }, (_, i) => sphere(0xffd454, -2.1 + (i % 12) * 0.38, -0.45 + Math.floor(i / 12) * 0.45, 0.06, root, { emissive: 0xffa000, emissiveIntensity: 0.5 }));
+    const COLS = 24; const TRACE = 100; const tone = new THREE.Color();
+    const particles = instanced(new THREE.SphereGeometry(0.055, 8, 6), 0xffffff, COLS * 3, root, { emissive: 0xffa000, emissiveIntensity: 0.35 });
     // Thin rows joining the particles, so you can see the rock itself stretch and shear.
     const rows = [0, 1, 2].map(() => {
-      const geometry = new THREE.BufferGeometry(); const attribute = new THREE.BufferAttribute(new Float32Array(12 * 3), 3); geometry.setAttribute("position", attribute);
+      const geometry = new THREE.BufferGeometry(); const attribute = new THREE.BufferAttribute(new Float32Array(COLS * 3), 3); geometry.setAttribute("position", attribute);
       root.add(new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0xffe9a8, transparent: true, opacity: 0.5 }))); return attribute;
     });
     const sparks = instanced(new THREE.SphereGeometry(0.04, 6, 5), 0xffd27a, 10, root, { emissive: 0xffa000, emissiveIntensity: 1.2 });
@@ -354,8 +356,8 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     const readout = label("", 0, -2.38, 4.2, root, 11);
     label("Drag the station · pull the hammer back · tap the rock or the wave label", 0, -2.85, 5.4, root, 14);
     label("Travel direction →", 0, -1.1, 3.5);
-    const traceValues = new Float32Array(80 * 3);
-    for (let j = 0; j < 80; j++) { traceValues[j * 3] = -2.25 + j * 0.0575; traceValues[j * 3 + 2] = -0.04; }
+    const traceValues = new Float32Array(TRACE * 3);
+    for (let j = 0; j < TRACE; j++) { traceValues[j * 3] = -2.25 + j * (4.5 / (TRACE - 1)); traceValues[j * 3 + 2] = -0.02; }
     const traceAttribute = new THREE.BufferAttribute(traceValues, 3);
     const traceGeometry = new THREE.BufferGeometry(); traceGeometry.setAttribute("position", traceAttribute);
     root.add(new THREE.Line(traceGeometry, new THREE.LineBasicMaterial({ color: 0x5cff9d })));
@@ -392,24 +394,27 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       const newest = strikes[strikes.length - 1];
       if (autoOn && time > newest.t + PERIOD) { strikes.push({ t: newest.t + PERIOD, amp: 1 }); if (strikes.length > 3) strikes.shift(); }
       const blocked = Boolean(a && b);
-      const freq = a ? 4 : 7; const speed = freq / 4;
+      const K = 5; const speed = a ? 1.0 : 1.75; const freq = K * speed;
       const field = (x: number, t: number) => strikes.reduce((sum, hit) => {
         const age = t - hit.t; if (age < 0) return sum;
-        const envelope = Math.exp(-(((x - X0 - speed * age) / 0.6) ** 2));
+        const envelope = Math.exp(-(((x - X0 - speed * age) / 0.9) ** 2));
         const damp = blocked ? Math.exp(-(x - X0) * 2.2) : 1;
-        return sum + hit.amp * envelope * damp * Math.sin(4 * (x - X0) - freq * age);
+        return sum + hit.amp * envelope * damp * Math.sin(K * (x - X0) - freq * age);
       }, 0) * 0.18;
 
       wave.set(blocked ? "S-wave blocked by liquid" : a ? "S-wave: transverse displacement" : "P-wave: compression and expansion");
       medium.material.color.setHex(b ? 0x2f6f9d : 0x6b5443);
-      particles.forEach((particle, i) => {
-        const x = -2.1 + (i % 12) * 0.38; const y = -0.45 + Math.floor(i / 12) * 0.45;
+      for (let i = 0; i < COLS * 3; i++) {
+        const c = i % COLS; const r = Math.floor(i / COLS);
+        const x = -2.07 + c * 0.18; const y = -0.45 + r * 0.45;
         const offset = field(x, time);
-        particle.position.set(x + (a ? 0 : offset), y + (a ? offset : 0), 0);
+        const ox = x + (a ? 0 : offset); const oy = y + (a ? offset : 0);
         const strength = Math.min(1.4, Math.abs(offset) / 0.18);
-        particle.scale.setScalar(1 + strength * 0.5); particle.material.color.setHSL(0.13 - Math.min(1, strength) * 0.11, 0.95, 0.55);
-      });
-      rows.forEach((attribute, r) => { for (let c = 0; c < 12; c++) { const p = particles[r * 12 + c].position; attribute.setXYZ(c, p.x, p.y, -0.02); } attribute.needsUpdate = true; });
+        particles.place(i, ox, oy, 0, 1 + strength * 0.5);
+        particles.tint(i, tone.setHSL(0.13 - Math.min(1, strength) * 0.11, 0.95, 0.55));
+        rows[r].setXYZ(c, ox, oy, -0.02);
+      }
+      rows.forEach(attribute => { attribute.needsUpdate = true; });
       fronts.forEach((front, k) => { const hit = strikes[strikes.length - 1 - k]; const x = hit ? X0 + speed * (time - hit.t) : 99; front.visible = Boolean(hit) && x > X0 && x < 2.4 && !(blocked && x > X0 + 0.7); front.position.x = x; });
       // Sparks fly out where the hammer lands.
       const recent = strikes[strikes.length - 1]; const spark = time - recent.t;
@@ -420,7 +425,7 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       station.position.set(stationX, 0.98, 0.1);
       const arrival = (stationX - X0) / speed;
       readout.set(held.name === "hammer" ? `Pull back, then let go · power ${Math.round(Math.abs(held.angle) / 1.25 * 100)}%` : blocked ? "No S-wave reaches the station" : `Station ${(stationX - X0).toFixed(1)} away · pulse arrives after ${arrival.toFixed(1)} s`);
-      for (let j = 0; j < 80; j++) traceValues[j * 3 + 1] = -1.8 + Math.max(-0.36, Math.min(0.36, field(stationX, time - (79 - j) * 0.03) * 1.7));
+      for (let j = 0; j < TRACE; j++) traceValues[j * 3 + 1] = -1.8 + Math.max(-0.36, Math.min(0.36, field(stationX, time - (TRACE - 1 - j) * 0.04) * 1.7));
       traceAttribute.needsUpdate = true;
     });
   } else if (id === "earth-scale") {
@@ -459,9 +464,26 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       if (index === 1 || index === 2) { face.material.polygonOffset = true; face.material.polygonOffsetFactor = -2; face.material.polygonOffsetUnits = -2; }
       return face;
     }));
-    const ghost = mesh(new THREE.SphereGeometry(R, 32, 22), 0x5e7f9f, 0, 0, 0, globe, { opacity: 0.24, roughness: 0.4 });
+    const ghost = mesh(new THREE.SphereGeometry(R, 32, 22, phiStart, phiLength), 0x4a78a8, 0, 0, 0, globe, { opacity: 0.55, roughness: 0.4 }); ghost.material.wireframe = true;
     const air = mesh(new THREE.SphereGeometry(R * 1.06, 40, 28), 0x6fb7ff, 0, 0, 0, globe, { opacity: 0.22, emissive: 0x3d8bff, emissiveIntensity: 0.5 }); air.material.side = THREE.BackSide;
     const caption = label("", 0, 2.3, 5.4);
+    // The four layers waiting to be built, center first. Drag one onto the globe, or tap it.
+    const chipHomes = buildOrder.map((_, order) => new THREE.Vector3(-2.25 + order * 1.5, -2.3, 0.2));
+    const chips = buildOrder.map((layerIndex, order) => {
+      const chip = new THREE.Group(); chip.position.copy(chipHomes[order]); root.add(chip);
+      mesh(new THREE.SphereGeometry(0.3, 20, 14), earthLayers[layerIndex].color, 0, 0, 0, chip, { roughness: 0.4 });
+      label(earthLayers[layerIndex].name, 0, -0.55, 1.4, chip, 4);
+      return chip;
+    });
+    const feedback = { text: "", until: 0 };
+    const heldChip = { index: -1, x: 0, y: 0 };
+    let sceneTime = 0;
+    const tryPlace = (order: number, api: InteractionApi) => {
+      const { lab } = api.values();
+      if (buildOrder[lab.layers] === buildOrder[order]) { api.setLab({ layers: lab.layers + 1 }); feedback.text = `${earthLayers[buildOrder[order]].name} placed at its scaled radius`; }
+      else feedback.text = "Build from the center outward";
+      feedback.until = sceneTime + 2.2;
+    };
 
     // Surface-detail view: a 3D slab of the top 350 km with rock textures, depth tags, and brackets for the two ways of naming layers.
     const detail = new THREE.Group(); detail.rotation.x = 0.28; root.add(detail);
@@ -501,12 +523,24 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     label("Left: what it is made of · Right: how it behaves", 0, -2.2, 5.2, detail, 12);
     label("Tap a layer to select it", 0, -2.6, 3.2, detail, 10);
     interact = {
-      targets: { crust: blocks[0], upper: blocks[1], soft: blocks[2] },
-      up: (name, _point, moved, api) => { if (moved < 8) api.setControl("b", name === "crust" ? 0 : name === "upper" ? 1 : 2); },
+      targets: { crust: blocks[0], upper: blocks[1], soft: blocks[2], chip0: chips[0], chip1: chips[1], chip2: chips[2], chip3: chips[3] },
+      down: (name, point) => { if (name.startsWith("chip")) { heldChip.index = Number(name.slice(4)); heldChip.x = point.x; heldChip.y = point.y; } },
+      move: (name, point) => { if (name.startsWith("chip")) { heldChip.x = point.x; heldChip.y = point.y; } },
+      up: (name, point, moved, api) => {
+        if (name.startsWith("chip")) { if (moved < 8 || Math.hypot(point.x, point.y) < 2.0) tryPlace(Number(name.slice(4)), api); heldChip.index = -1; }
+        else if (moved < 8) api.setControl("b", name === "crust" ? 0 : name === "upper" ? 1 : 2);
+      },
+      cancel: () => { heldChip.index = -1; },
     };
     updates.push((time, a, b, lab) => {
       globe.visible = !a; detail.visible = Boolean(a);
       textures[2].offset.x = (time * 0.05) % 1;
+      sceneTime = time;
+      chips.forEach((chip, order) => {
+        chip.visible = !a && order >= lab.layers;
+        if (heldChip.index === order) chip.position.set(heldChip.x, heldChip.y, 0.3); else chip.position.lerp(chipHomes[order], 0.25);
+        chip.scale.setScalar(order === lab.layers ? 1 + 0.08 * Math.sin(time * 4) : 0.9);
+      });
       blocks.forEach((block, i) => { const on = b === 0 ? i === 0 : b === 1 ? i <= 1 : b === 2 ? i === 2 : false; block.material.emissive.setHex(on ? [0x4a8a58, 0x35b0aa, 0xb060c4][i] : 0); block.material.emissiveIntensity = on ? 0.45 + 0.25 * Math.sin(time * 3) : 0; });
       globe.rotation.y = Math.sin(time * 0.45) * 0.28;
       const complete = lab.layers === 4;
@@ -523,7 +557,7 @@ export function createExperimentScene(root: THREE.Group, id: string) {
           face.material.emissiveIntensity = selected ? 0.7 + 0.5 * Math.sin(time * 3) : 0.22;
         });
       });
-      caption.set(lab.layers === 0 && !a ? "Add layers from the center outward" : `${earthLayers[b].name}: ${earthLayers[b].depth}`);
+      caption.set(!a && time < feedback.until ? feedback.text : lab.layers === 0 && !a ? "Drag the Inner core onto the globe to start" : lab.layers < 4 && !a ? "Now add the next layer, working outward" : `${earthLayers[b].name}: ${earthLayers[b].depth}`);
     });
   } else if (id === "replication" || id === "mutation") {
     const colors: Record<string, number> = { A: 0x3ea870, T: 0xd76164, C: 0x408bd0, G: 0xd8b238, "": 0x9caaba };
