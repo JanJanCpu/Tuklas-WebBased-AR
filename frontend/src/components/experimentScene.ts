@@ -330,38 +330,92 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       shared.forEach((electron, i) => { electron.visible = Boolean(a && i < lab.electrons * 2); electron.position.set((i < 2 ? (i % 2) * 0.18 - 0.09 : 0.52 + (i % 2) * 0.16) + Math.sin(time * 4 + i) * 0.03, (i < 2 ? 0 : -0.5) + Math.cos(time * 4 + i) * 0.03, 0.12); });
     });
   } else if (id === "seismic") {
+    // Each hammer strike sends a pulse through the rock. P-pulses are fast and push-pull, S-pulses are slower and sideways,
+    // and a station on the rock records when the pulse arrives (the delay grows with distance).
+    const X0 = -2.4; const PERIOD = 5.5;
     const medium = mesh(new THREE.BoxGeometry(4.8, 1.5, 0.12), 0x6b5443, 0, 0, -0.2, root, { roughness: 0.7 });
-    const front = mesh(new THREE.PlaneGeometry(0.45, 1.5), 0xffffff, 0, 0, -0.12, root, { opacity: 0.14, emissive: 0xffffff, emissiveIntensity: 0.3 });
+    const fronts = [0, 1].map(() => mesh(new THREE.PlaneGeometry(0.16, 1.5), 0xffffff, 0, 0, -0.12, root, { opacity: 0.22, emissive: 0xffffff, emissiveIntensity: 0.4 }));
     const particles = Array.from({ length: 36 }, (_, i) => sphere(0xffd454, -2.1 + (i % 12) * 0.38, -0.45 + Math.floor(i / 12) * 0.45, 0.06, root, { emissive: 0xffa000, emissiveIntensity: 0.5 }));
-    const wave = label("", 0, 1.2, 4.5); label("Travel direction →", 0, -1.1, 3.5);
-    // A hammer strikes the left edge once per wave, and a seismograph at the far end draws what arrives.
+    // Thin rows joining the particles, so you can see the rock itself stretch and shear.
+    const rows = [0, 1, 2].map(() => {
+      const geometry = new THREE.BufferGeometry(); const attribute = new THREE.BufferAttribute(new Float32Array(12 * 3), 3); geometry.setAttribute("position", attribute);
+      root.add(new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0xffe9a8, transparent: true, opacity: 0.5 }))); return attribute;
+    });
+    const sparks = instanced(new THREE.SphereGeometry(0.04, 6, 5), 0xffd27a, 10, root, { emissive: 0xffa000, emissiveIntensity: 1.2 });
+    const wave = label("", 0, 1.55, 4.5);
     const hammer = new THREE.Group(); hammer.position.set(-2.55, 0.85, 0); root.add(hammer);
     mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.7, 8), 0x8a6a4a, 0, -0.35, 0, hammer);
     mesh(new THREE.BoxGeometry(0.3, 0.22, 0.22), 0x59636e, 0, -0.72, 0, hammer, { metalness: 0.8, roughness: 0.3 });
+    const hammerGrab = new THREE.Mesh(new THREE.BoxGeometry(0.55, 1.0, 0.5), new THREE.MeshBasicMaterial()); hammerGrab.visible = false; hammerGrab.position.set(0, -0.45, 0); hammer.add(hammerGrab);
+    const station = new THREE.Group(); root.add(station);
+    const marker = mesh(new THREE.ConeGeometry(0.2, 0.4, 3), 0xff8a3d, 0, 0, 0, station, { emissive: 0xff6a00, emissiveIntensity: 0.5 }); marker.rotation.z = Math.PI;
+    const stationGrab = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.7, 0.5), new THREE.MeshBasicMaterial()); stationGrab.visible = false; station.add(stationGrab);
     mesh(new RoundedBoxGeometry(4.8, 0.8, 0.08, 2, 0.03), 0x0f1c2e, 0, -1.8, -0.1, root, { roughness: 0.8 });
-    label("Seismograph at the far end", 0, -2.38, 3, root, 9);
+    const readout = label("", 0, -2.38, 4.2, root, 11);
+    label("Drag the station · pull the hammer back · tap the rock or the wave label", 0, -2.85, 5.4, root, 14);
+    label("Travel direction →", 0, -1.1, 3.5);
     const traceValues = new Float32Array(80 * 3);
     for (let j = 0; j < 80; j++) { traceValues[j * 3] = -2.25 + j * 0.0575; traceValues[j * 3 + 2] = -0.04; }
     const traceAttribute = new THREE.BufferAttribute(traceValues, 3);
     const traceGeometry = new THREE.BufferGeometry(); traceGeometry.setAttribute("position", traceAttribute);
     root.add(new THREE.Line(traceGeometry, new THREE.LineBasicMaterial({ color: 0x5cff9d })));
     line([[-2.3, -1.8, -0.04], [2.3, -1.8, -0.04]], 0x2c4a63);
+
+    const strikes: { t: number; amp: number }[] = [];
+    let lastTime = -1; let stationX = 1.9;
+    const held = { name: "", angle: 0 };
+    const swing = { start: -10, from: 0 };
+    interact = {
+      targets: { hammer, station, rock: medium, waves: wave.sprite },
+      down: name => { held.name = name === "hammer" || name === "station" ? name : ""; held.angle = 0; },
+      move: (name, point) => {
+        if (name === "hammer") held.angle = Math.max(-1.25, Math.min(0, Math.atan2(point.x - hammer.position.x, -(point.y - hammer.position.y))));
+        else if (name === "station") stationX = Math.max(-1.7, Math.min(2.1, point.x));
+      },
+      up: (name, _point, moved, api) => {
+        if (name === "hammer") { const pull = moved < 8 ? 0.6 : Math.abs(held.angle); strikes.push({ t: lastTime + 0.12, amp: 0.5 + 0.8 * Math.min(1, pull / 1.2) }); swing.start = lastTime; swing.from = Math.max(0.5, pull); }
+        else if (name === "rock" && moved < 8) api.setControl("b", 1 - api.values().b);
+        else if (name === "waves" && moved < 8) api.setControl("a", 1 - api.values().a);
+        held.name = "";
+      },
+      cancel: () => { held.name = ""; },
+    };
     updates.push((time, a, b) => {
-      const speed = a ? 0.45 : 0.75; const phase = (time * speed) % 1;
-      hammer.rotation.z = phase < 0.7 ? -0.9 * (phase / 0.7) : -0.9 * (1 - (phase - 0.7) / 0.3);
-      for (let j = 0; j < 80; j++) { const t = time - (79 - j) * 0.03; traceValues[j * 3 + 1] = -1.8 + (a && b || t < 0 ? 0 : Math.sin(2.1 * 4 - t * (a ? 4 : 7)) * 0.34); }
-      traceAttribute.needsUpdate = true;
-      wave.set(a && b ? "S-wave blocked by liquid" : a ? "S-wave: transverse displacement" : "P-wave: compression and expansion");
-      medium.material.color.setHex(b ? 0x2f6f9d : 0x6b5443);
+      if (time < lastTime - 0.01 || !strikes.length) { strikes.length = 0; strikes.push({ t: 0.6, amp: 1 }); }
+      lastTime = time;
+      const newest = strikes[strikes.length - 1];
+      if (time > newest.t + PERIOD) { strikes.push({ t: newest.t + PERIOD, amp: 1 }); if (strikes.length > 3) strikes.shift(); }
       const blocked = Boolean(a && b);
-      front.visible = !blocked; front.position.x = -2.4 + ((time * (a ? 0.45 : 0.75)) % 1) * 4.8;
+      const freq = a ? 4 : 7; const speed = freq / 4;
+      const field = (x: number, t: number) => strikes.reduce((sum, hit) => {
+        const age = t - hit.t; if (age < 0) return sum;
+        const envelope = Math.exp(-(((x - X0 - speed * age) / 0.6) ** 2));
+        const damp = blocked ? Math.exp(-(x - X0) * 2.2) : 1;
+        return sum + hit.amp * envelope * damp * Math.sin(4 * (x - X0) - freq * age);
+      }, 0) * 0.18;
+
+      wave.set(blocked ? "S-wave blocked by liquid" : a ? "S-wave: transverse displacement" : "P-wave: compression and expansion");
+      medium.material.color.setHex(b ? 0x2f6f9d : 0x6b5443);
       particles.forEach((particle, i) => {
         const x = -2.1 + (i % 12) * 0.38; const y = -0.45 + Math.floor(i / 12) * 0.45;
-        const offset = blocked ? 0 : Math.sin(x * 4 - time * (a ? 4 : 7)) * 0.16;
+        const offset = field(x, time);
         particle.position.set(x + (a ? 0 : offset), y + (a ? offset : 0), 0);
-        const strength = Math.abs(offset) / 0.16;
-        particle.scale.setScalar(1 + strength * 0.5); particle.material.color.setHSL(0.13 - strength * 0.11, 0.95, 0.55);
+        const strength = Math.min(1.4, Math.abs(offset) / 0.18);
+        particle.scale.setScalar(1 + strength * 0.5); particle.material.color.setHSL(0.13 - Math.min(1, strength) * 0.11, 0.95, 0.55);
       });
+      rows.forEach((attribute, r) => { for (let c = 0; c < 12; c++) { const p = particles[r * 12 + c].position; attribute.setXYZ(c, p.x, p.y, -0.02); } attribute.needsUpdate = true; });
+      fronts.forEach((front, k) => { const hit = strikes[strikes.length - 1 - k]; const x = hit ? X0 + speed * (time - hit.t) : 99; front.visible = Boolean(hit) && x > X0 && x < 2.4 && !(blocked && x > X0 + 0.7); front.position.x = x; });
+      // Sparks fly out where the hammer lands.
+      const recent = strikes[strikes.length - 1]; const spark = time - recent.t;
+      for (let i = 0; i < 10; i++) { if (spark < 0 || spark > 0.5) { sparks.hide(i); continue; } const ang = (i / 10) * Math.PI - Math.PI / 2; sparks.place(i, X0 + 0.05 + Math.cos(ang) * spark * 0.9, Math.sin(ang) * spark * 1.1, 0.12, 1 - spark / 0.5); }
+      // Hammer: follows the finger while held, swings after release, and otherwise winds up just before each automatic strike.
+      const nextAuto = recent.t + PERIOD; const wind = (time - (nextAuto - 0.8)) / 0.7;
+      hammer.rotation.z = held.name === "hammer" ? held.angle : time - swing.start < 0.12 ? -swing.from * (1 - (time - swing.start) / 0.12) : wind > 0 && wind < 1 ? -0.9 * wind : 0;
+      station.position.set(stationX, 0.98, 0.1);
+      const arrival = (stationX - X0) / speed;
+      readout.set(blocked ? "No S-wave reaches the station" : `Station ${(stationX - X0).toFixed(1)} away · pulse arrives after ${arrival.toFixed(1)} s`);
+      for (let j = 0; j < 80; j++) traceValues[j * 3 + 1] = -1.8 + Math.max(-0.36, Math.min(0.36, field(stationX, time - (79 - j) * 0.03) * 1.7));
+      traceAttribute.needsUpdate = true;
     });
   } else if (id === "earth-scale") {
     // A globe with a quarter cut away, so every layer shows on the two flat cut faces (radii to scale).
@@ -399,8 +453,8 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       if (index === 1 || index === 2) { face.material.polygonOffset = true; face.material.polygonOffsetFactor = -2; face.material.polygonOffsetUnits = -2; }
       return face;
     }));
-    const ghost = mesh(new THREE.SphereGeometry(R, 32, 22), 0x9fb4c9, 0, 0, 0, globe, { opacity: 0.1, roughness: 0.4 });
-    const air = mesh(new THREE.SphereGeometry(R * 1.06, 40, 28), 0x6fb7ff, 0, 0, 0, globe, { opacity: 0.16, emissive: 0x3d8bff, emissiveIntensity: 0.5 }); air.material.side = THREE.BackSide;
+    const ghost = mesh(new THREE.SphereGeometry(R, 32, 22), 0x5e7f9f, 0, 0, 0, globe, { opacity: 0.24, roughness: 0.4 });
+    const air = mesh(new THREE.SphereGeometry(R * 1.06, 40, 28), 0x6fb7ff, 0, 0, 0, globe, { opacity: 0.22, emissive: 0x3d8bff, emissiveIntensity: 0.5 }); air.material.side = THREE.BackSide;
     const caption = label("", 0, 2.3, 5.4);
 
     // Surface-detail view: a slab of the top 350 km, drawn as a 3D block.
