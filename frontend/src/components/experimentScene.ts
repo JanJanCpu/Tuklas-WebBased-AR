@@ -106,19 +106,27 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     for (let i = 0; i <= 8; i++) mesh(new THREE.BoxGeometry(0.022, 0.006, i % 2 ? 0.28 : 0.5), i % 2 ? 0x3a4f66 : 0x1f2f43, -2 + i * 0.5, -0.347, 0);
 
     const cart = new THREE.Group(); root.add(cart);
-    mesh(new RoundedBoxGeometry(0.75, 0.35, 0.6, 4, 0.07), 0xdb3744, 0, 0, 0, cart, { roughness: 0.28, metalness: 0.3 });
-    mesh(new THREE.BoxGeometry(0.77, 0.04, 0.62), 0xf4f7fa, 0, -0.03, 0, cart, { roughness: 0.4 });
+    // A classic wagon: open tray with side walls, axles under a chassis bar, and a pull handle at the front.
+    const paint = { roughness: 0.3, metalness: 0.25 };
+    mesh(new RoundedBoxGeometry(0.75, 0.05, 0.6, 2, 0.02), 0xc42f3c, 0, -0.03, 0, cart, paint);
+    [-0.28, 0.28].forEach(z => mesh(new RoundedBoxGeometry(0.75, 0.17, 0.04, 2, 0.015), 0xdb3744, 0, 0.055, z, cart, paint));
+    [-0.355, 0.355].forEach(x => mesh(new RoundedBoxGeometry(0.04, 0.17, 0.6, 2, 0.015), 0xdb3744, x, 0.055, 0, cart, paint));
+    [-0.28, 0.28].forEach(z => mesh(new THREE.BoxGeometry(0.77, 0.018, 0.05), 0xf4f7fa, 0, 0.145, z, cart, { roughness: 0.4 }));
+    mesh(new THREE.BoxGeometry(0.7, 0.03, 0.1), 0x2a3444, 0, -0.085, 0, cart, { metalness: 0.6, roughness: 0.4 });
+    [-0.24, 0.24].forEach(x => { const axle = mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.72, 10), 0x8b97a5, x, -0.23, 0, cart, { metalness: 0.9, roughness: 0.3 }); axle.rotation.x = Math.PI / 2; });
+    const rod = mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.505, 10), 0x1c2635, 0.57, 0.08, 0, cart, { metalness: 0.5, roughness: 0.4 }); rod.rotation.z = Math.atan2(0.28, 0.42) - Math.PI / 2;
+    const grip = mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.26, 12), 0x1c2635, 0.78, 0.22, 0, cart, { roughness: 0.6 }); grip.rotation.x = Math.PI / 2;
     const wheels: THREE.Group[] = [];
-    [-0.24, 0.24].forEach(x => [-0.3, 0.3].forEach(z => {
+    [-0.24, 0.24].forEach(x => [-0.35, 0.35].forEach(z => {
       const wheel = new THREE.Group(); wheel.position.set(x, -0.23, z); cart.add(wheel); wheels.push(wheel);
       const tire = mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.1, 22), 0x1c2635, 0, 0, 0, wheel, { roughness: 0.85 }); tire.rotation.x = Math.PI / 2;
       const hub = mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.112, 14), 0xc4ced8, 0, 0, 0, wheel, { metalness: 0.9, roughness: 0.25 }); hub.rotation.x = Math.PI / 2;
       mesh(new THREE.BoxGeometry(0.1, 0.028, 0.116), 0x2a3b52, 0.035, 0, 0, wheel);
     }));
-    const blocks = [0, 1, 2, 3].map(i => mesh(new RoundedBoxGeometry(0.42, 0.11, 0.35, 2, 0.02), 0x6b86a6, 0, 0.24 + i * 0.12, 0, cart, { metalness: 0.75, roughness: 0.3 }));
+    const blocks = [0, 1, 2, 3].map(i => mesh(new RoundedBoxGeometry(0.42, 0.11, 0.35, 2, 0.02), 0x6b86a6, 0, 0.06 + i * 0.12, 0, cart, { metalness: 0.75, roughness: 0.3 }));
     const forward = arrow(0x16853f); forward.group.position.set(-0.4, 1.25, 0);
     const backward = arrow(0x2988d5); backward.group.position.set(0.4, 1.85, 0); backward.group.rotation.z = Math.PI; backward.group.visible = id === "launcher";
-    const balloon = sphere(0x45b9c5, 0, 0.63, 0.35, cart, { roughness: 0.2, metalness: 0.1 }); balloon.scale.x = 1.5; balloon.visible = id === "launcher";
+    const balloon = sphere(0x45b9c5, 0, 0.5, 0.35, cart, { roughness: 0.2, metalness: 0.1 }); balloon.scale.x = 1.5; balloon.visible = id === "launcher";
     const air = instanced(new THREE.SphereGeometry(0.05, 8, 6), 0xffffff, 10, cart, { opacity: 0.5, roughness: 0.2 });
     const streaks = instanced(new THREE.BoxGeometry(0.6, 0.018, 0.018), 0xffffff, 6, cart, { opacity: 0.4 });
     label(id === "launcher" ? "Air backward / cart forward" : "Frictionless track; wraps at edge", 0, -0.85, 4.5);
@@ -146,7 +154,7 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       for (let i = 0; i < 6; i++) { if (velocity <= 0.25) streaks.hide(i); else streaks.place(i, -0.55 - ((time * 2.4 + i / 6) % 1) * 0.7, 0.12 - (i % 3) * 0.13, (i < 3 ? -1 : 1) * 0.36, Math.min(1.6, 0.4 + velocity * 0.25), 1, 1); }
       if (id === "launcher") {
         balloon.scale.set(1.5 - 0.6 * ((time * 0.5) % 1) * (a > 0 ? 1 : 0), 1, 1);
-        for (let i = 0; i < 10; i++) { if (a <= 0) { air.hide(i); continue; } const age = (time * (0.8 + a * 0.15) + i / 10) % 1; air.place(i, -0.6 - age * 1.3, 0.63 + Math.sin(i * 2.1) * 0.12 * age, 0, (0.6 + age * 1.6) * (1 - 0.6 * age)); }
+        for (let i = 0; i < 10; i++) { if (a <= 0) { air.hide(i); continue; } const age = (time * (0.8 + a * 0.15) + i / 10) % 1; air.place(i, -0.6 - age * 1.3, 0.5 + Math.sin(i * 2.1) * 0.12 * age, 0, (0.6 + age * 1.6) * (1 - 0.6 * age)); }
       }
       forceLabel.set(drag.target === "cart" ? `Push: v₀ = ${drag.value} m/s` : drag.target === "arrow" ? `Force = ${a} N` : id === "launcher" ? `Equal forces: ${a} N each` : `a = ${acceleration.toFixed(2)} m/s²`);
     });
