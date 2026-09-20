@@ -15,6 +15,21 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     item.position.set(x, y, z); parent.add(item); return item;
   };
   const sphere = (color: number, x: number, y: number, r = 0.13, parent: THREE.Object3D = root, finish: Finish = {}) => mesh(new THREE.SphereGeometry(r, 20, 12), color, x, y, 0, parent, finish);
+  // Many identical small objects drawn as one batch. Separate meshes cost one draw call each, which is what limited budget phones.
+  const instanced = (geometry: THREE.BufferGeometry, color: number, count: number, parent: THREE.Object3D = root, finish: Finish = {}) => {
+    const material = new THREE.MeshStandardMaterial({ color, roughness: finish.roughness ?? 0.4, metalness: finish.metalness ?? 0.05 });
+    if (finish.emissive !== undefined) { material.emissive.setHex(finish.emissive); material.emissiveIntensity = finish.emissiveIntensity ?? 1; }
+    if (finish.opacity !== undefined) { material.transparent = true; material.opacity = finish.opacity; material.depthWrite = false; }
+    const item = new THREE.InstancedMesh(geometry, material, count);
+    item.frustumCulled = false; parent.add(item);
+    const dummy = new THREE.Object3D();
+    const place = (index: number, x: number, y: number, z: number, scaleX: number, scaleY = scaleX, scaleZ = scaleX) => {
+      dummy.position.set(x, y, z); dummy.scale.set(scaleX, scaleY, scaleZ); dummy.updateMatrix();
+      item.setMatrixAt(index, dummy.matrix); item.instanceMatrix.needsUpdate = true;
+    };
+    const hide = (index: number) => place(index, 0, 0, 0, 0);
+    return { item, material, place, hide };
+  };
   const line = (points: number[][], color = 0x486480, parent: THREE.Object3D = root) => {
     const item = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points.map(p => new THREE.Vector3(p[0], p[1], p[2] || 0))), new THREE.LineBasicMaterial({ color })); parent.add(item); return item;
   };
@@ -87,8 +102,8 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     const forward = arrow(0x16853f); forward.group.position.set(-0.4, 1.25, 0);
     const backward = arrow(0x2988d5); backward.group.position.set(0.4, 1.85, 0); backward.group.rotation.z = Math.PI; backward.group.visible = id === "launcher";
     const balloon = sphere(0x45b9c5, 0, 0.63, 0.35, cart, { roughness: 0.2, metalness: 0.1 }); balloon.scale.x = 1.5; balloon.visible = id === "launcher";
-    const air = Array.from({ length: 10 }, () => sphere(0xffffff, 0, 0, 0.05, cart, { opacity: 0.55, roughness: 0.2 }));
-    const streaks = Array.from({ length: 6 }, (_, i) => mesh(new THREE.BoxGeometry(0.6, 0.018, 0.018), 0xffffff, 0, 0.12 - (i % 3) * 0.13, (i < 3 ? -1 : 1) * 0.36, cart, { opacity: 0.4 }));
+    const air = instanced(new THREE.SphereGeometry(0.05, 8, 6), 0xffffff, 10, cart, { opacity: 0.5, roughness: 0.2 });
+    const streaks = instanced(new THREE.BoxGeometry(0.6, 0.018, 0.018), 0xffffff, 6, cart, { opacity: 0.4 });
     label(id === "launcher" ? "Air backward / cart forward" : "Frictionless track; wraps at edge", 0, -0.85, 4.5);
     const forceLabel = label("", 0, 2.25, 3.6);
     updates.push((time, a, b) => {
@@ -102,10 +117,11 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       blocks.forEach((block, i) => { block.visible = id === "force-mass" && i < b; });
       forward.group.visible = a > 0; backward.group.visible = id === "launcher" && a > 0;
       forward.set(0.4 + a * 0.25); backward.set(0.4 + a * 0.25);
-      streaks.forEach((streak, i) => { streak.visible = velocity > 0.25; streak.position.x = -0.55 - ((time * 2.4 + i / 6) % 1) * 0.7; streak.scale.x = Math.min(1.6, 0.4 + velocity * 0.25); streak.material.opacity = Math.min(0.5, velocity * 0.16); });
+      streaks.material.opacity = Math.min(0.5, velocity * 0.16);
+      for (let i = 0; i < 6; i++) { if (velocity <= 0.25) streaks.hide(i); else streaks.place(i, -0.55 - ((time * 2.4 + i / 6) % 1) * 0.7, 0.12 - (i % 3) * 0.13, (i < 3 ? -1 : 1) * 0.36, Math.min(1.6, 0.4 + velocity * 0.25), 1, 1); }
       if (id === "launcher") {
         balloon.scale.set(1.5 - 0.6 * ((time * 0.5) % 1) * (a > 0 ? 1 : 0), 1, 1);
-        air.forEach((puff, i) => { puff.visible = a > 0; const age = (time * (0.8 + a * 0.15) + i / air.length) % 1; puff.position.set(-0.6 - age * 1.3, 0.63 + Math.sin(i * 2.1) * 0.12 * age, 0); puff.scale.setScalar(0.6 + age * 1.6); puff.material.opacity = 0.55 * (1 - age); });
+        for (let i = 0; i < 10; i++) { if (a <= 0) { air.hide(i); continue; } const age = (time * (0.8 + a * 0.15) + i / 10) % 1; air.place(i, -0.6 - age * 1.3, 0.63 + Math.sin(i * 2.1) * 0.12 * age, 0, (0.6 + age * 1.6) * (1 - 0.6 * age)); }
       }
       forceLabel.set(id === "launcher" ? `Equal forces: ${a} N each` : `a = ${acceleration.toFixed(2)} m/s²`);
     });
@@ -120,7 +136,8 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     batteries.forEach(battery => mesh(new THREE.BoxGeometry(0.12, 0.06, 0.1), 0xd3dae2, 0, 0.2, 0, battery, { metalness: 0.9, roughness: 0.2 }));
     const batteryLabel = label("", 0, -1.62, 3);
     const switchLabel = label("", 0, 1.7, 4);
-    const electrons = Array.from({ length: 24 }, () => sphere(0x00a7e6, 0, 0, 0.065, root, { emissive: 0x00a7e6, emissiveIntensity: 1.4, roughness: 0.3 }));
+    const electrons = instanced(new THREE.SphereGeometry(0.065, 8, 6), 0x00a7e6, 24, root, { emissive: 0x00a7e6, emissiveIntensity: 1.4, roughness: 0.3 });
+    const electronAt = new THREE.Vector3();
     let signature = "";
     let paths: THREE.Vector3[][] = [];
     updates.push((time, a, b, lab) => {
@@ -131,7 +148,7 @@ export function createExperimentScene(root: THREE.Group, id: string) {
         wiring.traverse(object => { const item = object as THREE.Mesh; if (item.geometry) { item.geometry.dispose(); (item.material as THREE.Material).dispose(); } }); wiring.clear(); paths = [];
         if (c.parallel) {
           wire([[-2.2, -1.15], [-2.2, 0.8]], wiring); wire([[2.2, -1.15], [2.2, 0.8]], wiring);
-          for (let i = 0; i < 3; i++) { const y = 0.8 - i * 0.65; bulbs[i].position.set(0.8, y, 0); bulbLabels[i].sprite.position.set(0.8, y + 0.3, 0.18); if (lab.branchMask & (1 << i)) { const points = [[0, -1.15], [-2.2, -1.15], [-2.2, y], [2.2, y], [2.2, -1.15], [0, -1.15]]; wire(points, wiring); paths.push(points.map(p => new THREE.Vector3(p[0], p[1], 0))); } }
+          for (let i = 0; i < 3; i++) { const y = 0.8 - i * 0.65; bulbs[i].position.set(0.8, y, 0); bulbLabels[i].sprite.position.set(1.85, y + 0.2, 0.18); if (lab.branchMask & (1 << i)) { const points = [[0, -1.15], [-2.2, -1.15], [-2.2, y], [2.2, y], [2.2, -1.15], [0, -1.15]]; wire(points, wiring); paths.push(points.map(p => new THREE.Vector3(p[0], p[1], 0))); } }
         } else {
           const points = [[0, -1.15], [-2.2, -1.15], [-2.2, 0.6], [2.2, 0.6], [2.2, -1.15], [0, -1.15]]; wire(points, wiring); paths = [points.map(p => new THREE.Vector3(p[0], p[1], 0))];
           bulbs.forEach((bulb, i) => { bulb.position.set(-1.5 + i * 1.5, 0.6, 0); bulbLabels[i].sprite.position.set(-1.5 + i * 1.5, 1.05, 0.18); });
@@ -148,7 +165,7 @@ export function createExperimentScene(root: THREE.Group, id: string) {
         bulb.material.color.setHex(c.current > 0 ? 0xffd657 : 0x617183);
         bulbGlows[i].material.opacity = Math.min(0.85, brightness * 0.45) * (0.92 + 0.08 * Math.sin(time * 9 + i));
       });
-      electrons.forEach((electron, i) => { electron.visible = c.current > 0 && paths.length > 0; if (!electron.visible) return; const path = paths[i % paths.length]; const progress = ((time * c.branchCurrent * 0.45 + i / electrons.length) % 1) * (path.length - 1); const segment = Math.floor(progress); electron.position.copy(path[segment]).lerp(path[segment + 1], progress - segment); });
+      for (let i = 0; i < 24; i++) { if (!(c.current > 0 && paths.length > 0)) { electrons.hide(i); continue; } const path = paths[i % paths.length]; const progress = ((time * c.branchCurrent * 0.45 + i / 24) % 1) * (path.length - 1); const segment = Math.floor(progress); electronAt.copy(path[segment]).lerp(path[segment + 1], progress - segment); electrons.place(i, electronAt.x, electronAt.y, electronAt.z, 1); }
     });
   } else if (id === "chemical-change") {
     mesh(new THREE.CylinderGeometry(0.82, 0.82, 0.06, 32), 0xbfe3ef, 0, -0.8, 0, root, { opacity: 0.55, roughness: 0.05 });
@@ -157,8 +174,8 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     void jar;
     const liquid = mesh(new THREE.CylinderGeometry(0.76, 0.7, 0.55, 32), 0x7cbacd, 0, -0.47, 0, root, { opacity: 0.9, roughness: 0.1 });
     const powder = mesh(new THREE.ConeGeometry(0.4, 0.3, 24), 0xfaf3db, 0, -0.5);
-    const foam = Array.from({ length: 12 }, (_, i) => sphere(0xf3fbfd, Math.cos(i * 2.4) * 0.5, -0.15, 0.12, root, { roughness: 0.4 }));
-    const bubbles = Array.from({ length: 25 }, (_, i) => sphere(0xffffff, Math.sin(i * 2.4) * 0.6, 0, 0.065, root, { opacity: 0.8, roughness: 0.1 }));
+    const foam = instanced(new THREE.SphereGeometry(0.12, 10, 8), 0xf3fbfd, 12, root, { roughness: 0.4 });
+    const bubbles = instanced(new THREE.SphereGeometry(0.065, 8, 6), 0xffffff, 25, root, { opacity: 0.8, roughness: 0.1 });
     label("Vinegar + baking soda", 0, -1.2, 4);
     const result = label("", 0, 1.65, 4.7);
     updates.push((time, a, b) => {
@@ -167,13 +184,12 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       liquid.scale.y = 1 + reaction * 0.5; liquid.position.y = -0.47 + reaction * 0.07;
       liquid.material.color.setHex(reaction ? 0xcfeaf1 : 0x7cbacd);
       result.set(a && b ? "New substance: CO₂ gas ↑" : "Add both ingredients to react");
-      foam.forEach((cell, i) => { cell.visible = reaction > 0; cell.position.set(Math.cos(i * 2.4) * (0.15 + (i % 4) * 0.13), -0.17 + reaction * 0.18, Math.sin(i * 2.4) * (0.15 + (i % 4) * 0.13)); cell.scale.setScalar(reaction * (0.7 + 0.3 * Math.sin(time * 5 + i))); });
-      bubbles.forEach((bubble, i) => {
-        bubble.visible = a > 0 && b > 0 && i < Math.min(a, b) * 8;
+      for (let i = 0; i < 12; i++) foam.place(i, Math.cos(i * 2.4) * (0.15 + (i % 4) * 0.13), -0.17 + reaction * 0.18, Math.sin(i * 2.4) * (0.15 + (i % 4) * 0.13), reaction * (0.7 + 0.3 * Math.sin(time * 5 + i)));
+      for (let i = 0; i < 25; i++) {
+        if (!(a > 0 && b > 0 && i < Math.min(a, b) * 8)) { bubbles.hide(i); continue; }
         const age = ((time * 0.6 + i * 0.11) % 1.65) / 1.65;
-        bubble.position.set(Math.sin(i * 2.4) * 0.55 + Math.sin(time * 3 + i) * 0.05, -0.3 + age * 1.65, Math.cos(i * 2.4) * 0.3);
-        bubble.scale.setScalar((0.6 + age * 0.9) * (age > 0.86 ? Math.max(0, 1 - (age - 0.86) / 0.14) : 1));
-      });
+        bubbles.place(i, Math.sin(i * 2.4) * 0.55 + Math.sin(time * 3 + i) * 0.05, -0.3 + age * 1.65, Math.cos(i * 2.4) * 0.3, (0.6 + age * 0.9) * (age > 0.86 ? Math.max(0, 1 - (age - 0.86) / 0.14) : 1));
+      }
     });
   } else if (id === "bonding") {
     const sodium = sphere(0xab86da, -1.15, 0, 0.48, root, { roughness: 0.3, metalness: 0.15 }); const chlorine = sphere(0x4caf71, 1.15, 0, 0.6, root, { roughness: 0.3, metalness: 0.15 }); const hydrogen = sphere(0xe0e9f2, 0, -1, 0.25, root, { roughness: 0.3 });

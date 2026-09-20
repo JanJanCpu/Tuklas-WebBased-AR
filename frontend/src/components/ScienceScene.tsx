@@ -38,7 +38,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
     if (viewMode === "fallback") { camera.position.set(0, 1.4, 9); camera.lookAt(0, 0.2, 0); }
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setSize(mount.clientWidth, mount.clientHeight);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.1;
@@ -139,7 +139,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
         renderFps = Math.round(frames * 1000 / (now - statsAt));
         detectFps = Math.round(detects * 1000 / (now - statsAt));
         frames = 0; detects = 0; statsAt = now;
-        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState} | b4`;
+        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState} | b5`;
       }
     };
 
@@ -365,6 +365,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
       const geometries = new Set<THREE.BufferGeometry>();
       const materials = new Set<THREE.Material>();
       scene.traverse(object => {
+        if ((object as THREE.InstancedMesh).isInstancedMesh) (object as THREE.InstancedMesh).dispose();
         const renderable = object as THREE.Mesh;
         if (renderable.geometry) geometries.add(renderable.geometry);
         if (renderable.material) (Array.isArray(renderable.material) ? renderable.material : [renderable.material]).forEach(mat => materials.add(mat));
