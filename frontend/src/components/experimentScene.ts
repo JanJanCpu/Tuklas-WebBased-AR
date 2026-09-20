@@ -111,7 +111,6 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     mesh(new RoundedBoxGeometry(0.75, 0.05, 0.6, 2, 0.02), 0xc42f3c, 0, -0.03, 0, cart, paint);
     [-0.28, 0.28].forEach(z => mesh(new RoundedBoxGeometry(0.75, 0.17, 0.04, 2, 0.015), 0xdb3744, 0, 0.055, z, cart, paint));
     [-0.355, 0.355].forEach(x => mesh(new RoundedBoxGeometry(0.04, 0.17, 0.6, 2, 0.015), 0xdb3744, x, 0.055, 0, cart, paint));
-    [-0.28, 0.28].forEach(z => mesh(new THREE.BoxGeometry(0.77, 0.018, 0.05), 0xf4f7fa, 0, 0.145, z, cart, { roughness: 0.4 }));
     mesh(new THREE.BoxGeometry(0.7, 0.03, 0.1), 0x2a3444, 0, -0.085, 0, cart, { metalness: 0.6, roughness: 0.4 });
     [-0.24, 0.24].forEach(x => { const axle = mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.72, 10), 0x8b97a5, x, -0.23, 0, cart, { metalness: 0.9, roughness: 0.3 }); axle.rotation.x = Math.PI / 2; });
     const rod = mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.505, 10), 0x1c2635, 0.57, 0.08, 0, cart, { metalness: 0.5, roughness: 0.4 }); rod.rotation.z = Math.atan2(0.28, 0.42) - Math.PI / 2;
