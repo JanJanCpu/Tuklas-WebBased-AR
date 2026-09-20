@@ -208,6 +208,32 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
       animationId = requestAnimationFrame(render);
     };
 
+    // 3D mode: measure what this experiment actually shows and frame it, instead of one fixed distance for all.
+    const sceneBounds = new THREE.Box3();
+    if (viewMode === "fallback") {
+      const expand = (object: THREE.Object3D) => {
+        if (!object.visible) return;
+        const item = object as THREE.Mesh;
+        if (item.geometry && (item.material as THREE.Material | undefined)?.opacity !== 0) {
+          if (!item.geometry.boundingBox) item.geometry.computeBoundingBox();
+          sceneBounds.union(item.geometry.boundingBox!.clone().applyMatrix4(object.matrixWorld));
+        }
+        object.children.forEach(expand);
+      };
+      const start = valuesRef.current;
+      // Sample a few moments so moving parts (cart, bubbles, waves) stay inside the frame.
+      [0, 0.7, 1.4, 2.1].forEach(time => { updateExperiment(time, start.controlA, start.controlB, start.lab); scene.updateMatrixWorld(true); expand(contentRoot); });
+    }
+    const frameScene = () => {
+      if (sceneBounds.isEmpty()) return;
+      const size = sceneBounds.getSize(new THREE.Vector3());
+      const center = sceneBounds.getCenter(new THREE.Vector3());
+      const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+      const distance = Math.max(size.y / 2 / tanHalf, size.x / 2 / (tanHalf * camera.aspect)) * 1.12 + size.z / 2;
+      camera.position.set(center.x, center.y + distance * 0.12, center.z + distance);
+      camera.lookAt(center);
+    };
+
     const resize = () => {
       renderer.setSize(mount.clientWidth, mount.clientHeight);
       if (viewMode === "ar" && arSource && arContext) {
@@ -215,8 +241,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
         camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
       } else if (viewMode === "fallback") {
         camera.aspect = mount.clientWidth / Math.max(1, mount.clientHeight);
-        camera.position.z = Math.max(9, 3.2 / (Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect));
-        camera.lookAt(0, 0.2, 0);
+        frameScene();
         camera.updateProjectionMatrix();
       }
     };
