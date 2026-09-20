@@ -21,7 +21,7 @@ const PINCH_OFF = 0.45;
 
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 
-export async function createHandTracker(): Promise<HandTracker> {
+export async function createHandTracker(preferred: "GPU" | "CPU" = "GPU"): Promise<HandTracker> {
   const { FilesetResolver, HandLandmarker } = await import("@mediapipe/tasks-vision");
   const vision = await FilesetResolver.forVisionTasks("/mediapipe");
   const options = (delegate: "GPU" | "CPU") => ({
@@ -30,9 +30,9 @@ export async function createHandTracker(): Promise<HandTracker> {
     numHands: 1,
   });
   let landmarker: HandLandmarker;
-  let delegate: "GPU" | "CPU" = "GPU";
+  let delegate: "GPU" | "CPU" = preferred;
   try {
-    landmarker = await HandLandmarker.createFromOptions(vision, options("GPU"));
+    landmarker = await HandLandmarker.createFromOptions(vision, options(preferred));
   } catch {
     delegate = "CPU";
     landmarker = await HandLandmarker.createFromOptions(vision, options("CPU"));

@@ -125,7 +125,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
         renderFps = Math.round(frames * 1000 / (now - statsAt));
         detectFps = Math.round(detects * 1000 / (now - statsAt));
         frames = 0; detects = 0; statsAt = now;
-        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState}`;
+        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState} | b3`;
       }
     };
 
@@ -140,7 +140,8 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
       handText.textContent = handState;
       handHud.append(handDot, handText);
       mount!.appendChild(handHud);
-      createHandTracker().then(tracker => {
+      const preferred = new URLSearchParams(window.location.search).get("hands")?.toLowerCase() === "cpu" ? "CPU" : "GPU";
+      createHandTracker(preferred).then(tracker => {
         if (cancelled) { tracker.close(); return; }
         handTracker = tracker;
         handState = "no hand";
