@@ -86,11 +86,13 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
     // Diagnostics: ?empty=1 hides the model (measures AR tracking alone); ?detect=2 analyzes the camera every 2nd frame.
     const urlParams = new URLSearchParams(window.location.search);
     const emptyScene = urlParams.has("empty");
-    const detectEvery = Math.max(1, Number(urlParams.get("detect")) || 1);
+    const detectFromUrl = Math.max(1, Number(urlParams.get("detect")) || 1);
+    let detectEvery = detectFromUrl;
     let arFrame = 0;
     if (emptyScene) modelRoot.visible = false;
 
-    // Quality levels: 0 full, 1 lower resolution, 2 also simple shading. Steps down by itself on a struggling phone.
+    // Quality levels, cheapest-to-hide first: 0 full, 1 analyze the camera every 2nd frame (the AR tracking is the main cost
+    // on weak phones), 2 also lower resolution, 3 also simple shading. Steps down by itself on a struggling phone.
     const forcedQuality = new URLSearchParams(window.location.search).get("q");
     let quality = 0;
     let qFrames = 0;
@@ -100,12 +102,13 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
     const applyQuality = (level: number) => {
       if (level === quality) return;
       quality = level;
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, level >= 1 ? 1 : 1.5));
-      if (level >= 2) { scene.environment = null; ambientLight.intensity = 0.95; updateExperiment.setLite(); }
+      detectEvery = Math.max(detectFromUrl, level >= 1 ? 2 : 1);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, level >= 2 ? 1 : 1.5));
+      if (level >= 3) { scene.environment = null; ambientLight.intensity = 0.95; updateExperiment.setLite(); }
     };
     let storedQuality = 0;
-    try { storedQuality = Number(localStorage.getItem("tuklas-quality")) || 0; } catch { /* storage unavailable */ }
-    applyQuality(Math.min(2, forcedQuality !== null ? Number(forcedQuality) || 0 : storedQuality));
+    try { storedQuality = Number(localStorage.getItem("tuklas-quality-v2")) || 0; } catch { /* storage unavailable */ }
+    applyQuality(Math.min(3, forcedQuality !== null ? Number(forcedQuality) || 0 : storedQuality));
     const watchFrameRate = (now: number) => {
       qFrames += 1;
       const elapsed = now - qStart;
@@ -114,12 +117,12 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
       qFrames = 0; qStart = now;
       if (elapsed > 2500) return; // tab was hidden; not a real reading
       qWindows += 1;
-      if (forcedQuality !== null || quality >= 2 || qWindows <= 3) return;
+      if (forcedQuality !== null || quality >= 3 || qWindows <= 3) return;
       lowWindows = fps < 19 ? lowWindows + 1 : 0;
       if (lowWindows < 3) return;
       lowWindows = 0; qWindows = 0;
       applyQuality(quality + 1);
-      try { localStorage.setItem("tuklas-quality", String(quality)); } catch { /* storage unavailable */ }
+      try { localStorage.setItem("tuklas-quality-v2", String(quality)); } catch { /* storage unavailable */ }
     };
     let elapsed = 0;
     let previousTime = performance.now();
@@ -179,7 +182,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
         renderFps = Math.round(frames * 1000 / (now - statsAt));
         detectFps = Math.round(detects * 1000 / (now - statsAt));
         frames = 0; detects = 0; statsAt = now;
-        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState} | q${quality} d${detectEvery}${emptyScene ? " empty" : ""} | b7`;
+        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState} | q${quality} d${detectEvery}${emptyScene ? " empty" : ""} | b8`;
       }
     };
 
@@ -215,7 +218,8 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
       if (!emptyScene) updateExperiment(elapsed, current.controlA, current.controlB, current.lab);
       if (viewMode === "ar" && arSource?.ready && arContext) {
         arFrame += 1;
-        if (arFrame % detectEvery === 0) arContext.update(arSource.domElement);
+        const analyzed = arFrame % detectEvery === 0;
+        if (analyzed) arContext.update(arSource.domElement);
         if (trackedRoot.visible) {
           missedFrames = 0;
           presentationRoot.visible = true;
@@ -229,7 +233,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
             presentationRoot.quaternion.slerp(trackedRoot.quaternion, 0.28);
             presentationRoot.scale.lerp(trackedRoot.scale, 0.32);
           }
-        } else if (hasStablePose) {
+        } else if (hasStablePose && analyzed) {
           missedFrames += 1;
           if (missedFrames > 6) {
             presentationRoot.visible = false;
