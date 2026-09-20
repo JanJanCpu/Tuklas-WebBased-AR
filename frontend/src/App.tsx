@@ -856,7 +856,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
               </div>
               <div className={`ar-frame ${viewMode === "fallback" ? "fallback-mode" : ""}`}>
                 <Suspense fallback={null}>
-                  <ScienceScene moduleId={activeModule.id} controlA={controlA} controlB={controlB} lab={lab} trialPulse={trialPulse} viewMode={viewMode} onArReady={setCameraReady} onArStatus={setCameraStatus} onMarkerChange={setMarkerDetected} onControlChange={(which, value) => (which === "a" ? setControlA(value) : setControlB(value))} />
+                  <ScienceScene moduleId={activeModule.id} controlA={controlA} controlB={controlB} lab={lab} trialPulse={trialPulse} viewMode={viewMode} onArReady={setCameraReady} onArStatus={setCameraStatus} onMarkerChange={setMarkerDetected} onControlChange={(which, value) => (which === "a" ? setControlA(value) : setControlB(value))} onLabChange={patch => setLab(current => ({ ...current, ...patch }))} />
                 </Suspense>
               </div>
               {viewMode === "ar" && (

@@ -2,8 +2,8 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { ViewMode } from "../types/domain";
-import { createExperimentScene } from "./experimentScene";
-import { controls, type LabState } from "../lib/experiments";
+import { createExperimentScene, type InteractionApi } from "./experimentScene";
+import type { LabState } from "../lib/experiments";
 import { loadArToolkit } from "../lib/arjs";
 import { createHandTracker, type HandSample, type HandTracker } from "../lib/handTracking";
 
@@ -19,6 +19,8 @@ interface ScienceSceneProps {
   onArStatus?: (status: string) => void;
   /** Called when the student changes a variable by touching the model instead of using the slider. */
   onControlChange?: (which: "a" | "b", value: number) => void;
+  /** Called when the student changes lab state (electrons placed, layers added...) by touching the model. */
+  onLabChange?: (patch: Partial<LabState>) => void;
 }
 
 const cameraParametersUrl = "/assets/camera_para.dat";
@@ -26,12 +28,14 @@ const tuklasMarkerUrl = "/assets/tuklas-marker.patt";
 const HAND_INTERVAL_MS = 66;
 const HAND_SEARCH_INTERVAL_MS = 250;
 
-export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, viewMode, onArReady, onArStatus, onMarkerChange, onControlChange }: ScienceSceneProps) {
+export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, viewMode, onArReady, onArStatus, onMarkerChange, onControlChange, onLabChange }: ScienceSceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const valuesRef = useRef({ controlA, controlB, lab, trialPulse });
   valuesRef.current = { controlA, controlB, lab, trialPulse };
   const controlChangeRef = useRef(onControlChange);
   controlChangeRef.current = onControlChange;
+  const labChangeRef = useRef(onLabChange);
+  labChangeRef.current = onLabChange;
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -146,17 +150,21 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
     mount.style.touchAction = interact ? "pan-y" : "";
     const inputCleanup: (() => void)[] = [];
     if (interact) {
-      const ranges = controls[moduleId as keyof typeof controls];
       const raycaster = new THREE.Raycaster();
       const pointer = new THREE.Vector2();
       const plane = new THREE.Plane();
       const planeNormal = new THREE.Vector3();
       const planeOrigin = new THREE.Vector3();
       const hitPoint = new THREE.Vector3();
+      const api: InteractionApi = {
+        values: () => { const current = valuesRef.current; return { a: current.controlA, b: current.controlB, lab: current.lab }; },
+        setControl: (which, value) => controlChangeRef.current?.(which, value),
+        setLab: patch => labChangeRef.current?.(patch),
+        restart: () => { elapsed = 0; },
+      };
       let grab = "";
       let start = { x: 0, y: 0 };
       let moved = 0;
-      const snap = (which: 0 | 1, raw: number) => { const range = ranges[which]; return Math.min(range.max, Math.max(range.min, Math.round(raw / range.step) * range.step)); };
       const aim = (event: PointerEvent) => {
         const rect = renderer.domElement.getBoundingClientRect();
         pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
@@ -170,47 +178,37 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
         plane.setFromNormalAndCoplanarPoint(planeNormal, planeOrigin);
         return raycaster.ray.intersectPlane(plane, hitPoint) ? contentRoot.worldToLocal(hitPoint.clone()) : null;
       };
+      const shown = (object: THREE.Object3D) => { for (let node: THREE.Object3D | null = object; node; node = node.parent) if (!node.visible) return false; return true; };
       const nameOf = (object: THREE.Object3D) => {
-        for (const [name, target] of Object.entries(interact.targets)) for (let node: THREE.Object3D | null = object; node; node = node.parent) if (node === target) return name;
+        for (const [name, target] of Object.entries(interact.targets)) for (let node: THREE.Object3D | null = object; node; node = node.parent) if (node === target) return shown(target) ? name : "";
         return "";
       };
+      const finish = (event: PointerEvent) => { grab = ""; if (mount.hasPointerCapture(event.pointerId)) mount.releasePointerCapture(event.pointerId); };
       const onDown = (event: PointerEvent) => {
         if (viewMode === "ar" && !presentationRoot.visible) return;
         aim(event);
-        const hit = raycaster.intersectObjects(Object.values(interact.targets), true)[0];
-        const name = hit ? nameOf(hit.object) : "";
+        const name = raycaster.intersectObjects(Object.values(interact.targets), true).map(hit => nameOf(hit.object)).find(Boolean) ?? "";
         if (!name) return;
         grab = name; start = { x: event.clientX, y: event.clientY }; moved = 0;
         mount.setPointerCapture(event.pointerId);
-        onMove(event);
+        const point = tablePoint();
+        if (point) interact.down?.(name, point, api);
       };
       const onMove = (event: PointerEvent) => {
         if (!grab) return;
         moved = Math.max(moved, Math.hypot(event.clientX - start.x, event.clientY - start.y));
         aim(event);
         const point = tablePoint();
-        if (!point) return;
-        if (grab === "arrow" && interact.arrowValue) {
-          interact.drag.target = "arrow";
-          const value = snap(0, interact.arrowValue(point.x));
-          if (value !== valuesRef.current.controlA) controlChangeRef.current?.("a", value);
-        } else if (grab === "cart" && interact.cartMode === "push" && moved >= 8) {
-          const x = Math.min(interact.trackEnd, Math.max(interact.trackStart, point.x));
-          interact.drag.target = "cart"; interact.drag.x = x;
-          interact.drag.value = snap(1, (x - interact.trackStart) / (interact.trackEnd - interact.trackStart) * ranges[1].max);
-        }
+        if (point) interact.move?.(grab, point, moved, api);
       };
       const onUp = (event: PointerEvent) => {
         if (!grab) return;
-        if (grab === "cart" && interact.cartMode === "push" && moved >= 8) { controlChangeRef.current?.("b", interact.drag.value); elapsed = 0; }
-        else if (grab === "cart" && interact.cartMode === "tap" && moved < 8) { const range = ranges[1]; const next = valuesRef.current.controlB + range.step; controlChangeRef.current?.("b", next > range.max ? range.min : next); }
-        else if (grab === "arrow") elapsed = 0;
-        onCancel(event);
+        aim(event);
+        const point = tablePoint();
+        if (point) interact.up?.(grab, point, moved, api); else interact.cancel?.();
+        finish(event);
       };
-      const onCancel = (event: PointerEvent) => {
-        interact.drag.target = ""; grab = "";
-        if (mount.hasPointerCapture(event.pointerId)) mount.releasePointerCapture(event.pointerId);
-      };
+      const onCancel = (event: PointerEvent) => { if (!grab) return; interact.cancel?.(); finish(event); };
       mount.addEventListener("pointerdown", onDown);
       mount.addEventListener("pointermove", onMove);
       mount.addEventListener("pointerup", onUp);
@@ -267,7 +265,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
         renderFps = Math.round(frames * 1000 / (now - statsAt));
         detectFps = Math.round(detects * 1000 / (now - statsAt));
         frames = 0; detects = 0; statsAt = now;
-        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState} | q${quality} d${detectEvery}${emptyScene ? " empty" : ""} | b12`;
+        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState} | q${quality} d${detectEvery}${emptyScene ? " empty" : ""} | b13`;
       }
     };
 
@@ -360,7 +358,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
       const size = sceneBounds.getSize(new THREE.Vector3());
       const center = sceneBounds.getCenter(new THREE.Vector3());
       const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-      const distance = Math.max(size.y / 2 / tanHalf, size.x / 2 / (tanHalf * camera.aspect)) * 1.12 + size.z / 2;
+      const distance = Math.max(size.y / 2 / tanHalf, size.x / 2 / (tanHalf * camera.aspect)) * 1.12 + size.z * 0.15;
       camera.position.set(center.x, center.y + distance * 0.12, center.z + distance);
       camera.lookAt(center);
     };

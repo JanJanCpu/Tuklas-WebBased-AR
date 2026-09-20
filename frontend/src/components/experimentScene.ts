@@ -1,18 +1,23 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import { circuitState, complement, earthLayers, mutationState, originalDna, template, type LabState } from "../lib/experiments";
+import { circuitState, complement, controls, earthLayers, mutationState, originalDna, template, type LabState } from "../lib/experiments";
 
-/** What a student can grab in a scene. The scene input handler in ScienceScene drives this. */
+/** What a scene lets the student change from inside the model. ScienceScene supplies the pointer position and this API. */
+export interface InteractionApi {
+  values(): { a: number; b: number; lab: LabState };
+  setControl(which: "a" | "b", value: number): void;
+  setLab(patch: Partial<LabState>): void;
+  /** Restart the trial clock so the model runs again from the start. */
+  restart(): void;
+}
 export interface Interaction {
+  /** Grabbable roots. A target only counts while it is visible. */
   targets: Record<string, THREE.Object3D>;
-  /** Written by the input handler while a grab is in progress. */
-  drag: { target: string; x: number; value: number };
-  /** Force arrow tip position (local x) to control A value. */
-  arrowValue?: (localX: number) => number;
-  /** "push": drag the cart forward to set initial velocity (B). "tap": tapping the cart cycles mass (B). */
-  cartMode?: "push" | "tap";
-  trackStart: number;
-  trackEnd: number;
+  /** Positions are in the scene's own units on its table plane. `moved` is how far the pointer travelled in screen pixels. */
+  down?(name: string, point: THREE.Vector3, api: InteractionApi): void;
+  move?(name: string, point: THREE.Vector3, moved: number, api: InteractionApi): void;
+  up?(name: string, point: THREE.Vector3, moved: number, api: InteractionApi): void;
+  cancel?(): void;
 }
 
 interface Finish { roughness?: number; metalness?: number; emissive?: number; emissiveIntensity?: number; opacity?: number }
@@ -135,7 +140,24 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     const cartMode = id === "inertia" ? "push" : id === "force-mass" ? "tap" : undefined;
     label(id === "inertia" ? "Drag cart = push · drag arrow = force" : id === "force-mass" ? "Drag arrow = force · tap cart = mass" : "Drag the arrow to set thrust", 0, -1.45, 4.6, root, 11);
     const drag = { target: "", x: 0, value: 0 };
-    interact = { targets: cartMode ? { cart, arrow: arrowGrab } : { arrow: arrowGrab }, drag, cartMode, trackStart: -2, trackEnd: 2, arrowValue: localX => (localX - forward.group.position.x - 0.13 - 0.4) / 0.25 };
+    const ranges = controls[id as keyof typeof controls];
+    const snap = (which: 0 | 1, raw: number) => { const range = ranges[which]; return Math.min(range.max, Math.max(range.min, Math.round(raw / range.step) * range.step)); };
+    const setArrow = (point: THREE.Vector3, api: InteractionApi) => { drag.target = "arrow"; const value = snap(0, (point.x - forward.group.position.x - 0.13 - 0.4) / 0.25); if (value !== api.values().a) api.setControl("a", value); };
+    interact = {
+      targets: cartMode ? { cart, arrow: forward.group } : { arrow: forward.group },
+      down: (name, point, api) => { if (name === "arrow") setArrow(point, api); },
+      move: (name, point, moved, api) => {
+        if (name === "arrow") setArrow(point, api);
+        else if (name === "cart" && cartMode === "push" && moved >= 8) { const x = Math.min(2, Math.max(-2, point.x)); drag.target = "cart"; drag.x = x; drag.value = snap(1, (x + 2) / 4 * ranges[1].max); }
+      },
+      up: (name, _point, moved, api) => {
+        if (name === "cart" && cartMode === "push" && moved >= 8) { api.setControl("b", drag.value); api.restart(); }
+        else if (name === "cart" && cartMode === "tap" && moved < 8) { const next = api.values().b + ranges[1].step; api.setControl("b", next > ranges[1].max ? ranges[1].min : next); }
+        else if (name === "arrow") api.restart();
+        drag.target = "";
+      },
+      cancel: () => { drag.target = ""; },
+    };
     updates.push((time, a, b) => {
       const acceleration = a / (id === "inertia" ? 1 : b);
       const initialVelocity = id === "inertia" ? b : 0;
@@ -224,8 +246,33 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     const foam = instanced(new THREE.SphereGeometry(0.12, 10, 8), 0xf3fbfd, 12, root, { roughness: 0.4 });
     const bubbles = instanced(new THREE.SphereGeometry(0.065, 8, 6), 0xffffff, 25, root, { opacity: 0.8, roughness: 0.1 });
     label("Vinegar + baking soda", 0, -1.2, 4);
+    label("Drag the bottle or the jar over the beaker", 0, -1.75, 4.6, root, 11);
     const result = label("", 0, 1.65, 4.7);
+    const bottleHome = new THREE.Vector3(-1.6, -0.83, 0); const jarHome = new THREE.Vector3(1.6, -0.83, 0);
+    const held = { name: "", dx: 0, dy: 0, over: false };
+    const overBeaker = (point: THREE.Vector3) => Math.abs(point.x) < 1.15 && point.y > -0.5;
+    const holding = (name: string) => name === "bottle" ? bottle : jarSoda;
+    interact = {
+      targets: { bottle, jar: jarSoda },
+      down: (name, point) => { const item = holding(name); held.name = name; held.dx = item.position.x - point.x; held.dy = item.position.y - point.y; held.over = false; },
+      move: (name, point) => { held.over = overBeaker(point); holding(name).position.set(point.x + held.dx, Math.max(-0.83, point.y + held.dy), 0); },
+      up: (name, point, moved, api) => {
+        if (moved < 8 || overBeaker(point)) {
+          const { a, b } = api.values();
+          if (name === "bottle" && a < 3) api.setControl("a", a + 1);
+          if (name === "jar" && b < 3) api.setControl("b", b + 1);
+          api.restart();
+        }
+        held.name = ""; held.over = false;
+      },
+      cancel: () => { held.name = ""; held.over = false; },
+    };
     updates.push((time, a, b) => {
+      // Containers follow the finger, tip toward the beaker when over it, and slide back home when let go.
+      if (held.name !== "bottle") bottle.position.lerp(bottleHome, 0.25);
+      if (held.name !== "jar") jarSoda.position.lerp(jarHome, 0.25);
+      bottle.rotation.z += ((held.name === "bottle" && held.over ? -0.9 : 0) - bottle.rotation.z) * 0.25;
+      jarSoda.rotation.z += ((held.name === "jar" && held.over ? 0.9 : 0) - jarSoda.rotation.z) * 0.25;
       const reaction = a > 0 && b > 0 ? Math.min(a, b) / 3 : 0;
       liquid.visible = a > 0; powder.visible = b > 0 && !reaction;
       liquid.scale.y = 1 + reaction * 0.5; liquid.position.y = -0.47 + reaction * 0.07;
@@ -243,17 +290,43 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     const first = label("Na", -1.15, 0.95, 0.9, root, 2); const second = label("Cl", 1.15, 0.95, 0.9, root, 2); const third = label("H", 0, -1.5, 0.6, root, 2);
     const electrons = Array.from({ length: 8 }, () => sphere(0xffca28, 0, 0, 0.07, root, { emissive: 0xffa000, emissiveIntensity: 0.9 }));
     const shared = Array.from({ length: 4 }, () => sphere(0xffca28, 0, 0, 0.07, root, { emissive: 0xffa000, emissiveIntensity: 0.9 }));
+    // Draggable electron tokens: sodium's outer electron (ionic) or an electron pair (covalent).
+    const grabArea = (parent: THREE.Object3D, radius: number) => { const area = new THREE.Mesh(new THREE.SphereGeometry(radius, 8, 6), new THREE.MeshBasicMaterial()); area.visible = false; parent.add(area); };
+    grabArea(electrons[7], 0.35);
+    const pairHome = new THREE.Vector3(0, 0.95, 0.12);
+    const pairToken = new THREE.Group(); pairToken.position.copy(pairHome); root.add(pairToken);
+    [-0.09, 0.09].forEach(x => sphere(0xffca28, x, 0, 0.09, pairToken, { emissive: 0xffa000, emissiveIntensity: 1.1 }));
+    grabArea(pairToken, 0.32);
+    const bondHint = label("", 0, -1.9, 4.8, root, 11);
+    const held = { name: "", x: 0, y: 0 };
+    interact = {
+      targets: { electron: electrons[7], pair: pairToken },
+      down: (name, point) => { held.name = name; held.x = point.x; held.y = point.y; },
+      move: (_name, point) => { held.x = point.x; held.y = point.y; },
+      up: (name, point, moved, api) => {
+        const { a, lab } = api.values();
+        const tap = moved < 8;
+        if (name === "electron" && !a && lab.electrons === 0 && (tap || Math.hypot(point.x - 1.15, point.y) < 1.1)) api.setLab({ electrons: 1 });
+        else if (name === "pair" && a && lab.electrons < 2 && (tap || Math.hypot(point.x, point.y) < 0.7 || Math.hypot(point.x - 0.575, point.y + 0.5) < 0.7)) api.setLab({ electrons: lab.electrons + 1 });
+        held.name = "";
+      },
+      cancel: () => { held.name = ""; },
+    };
     const shellCl = mesh(new THREE.TorusGeometry(0.78, 0.012, 6, 64), 0x9fb4c9, 1.15, 0, 0, root, { opacity: 0.55 });
     const shellNa = mesh(new THREE.TorusGeometry(0.68, 0.012, 6, 64), 0x9fb4c9, -1.15, 0, 0, root, { opacity: 0.55 });
     const bond1 = line([[-1.15, 0], [1.15, 0]], 0x567890); const bond2 = line([[1.15, 0], [0, -1]], 0x567890);
     updates.push((time, a, b, lab) => {
       root.rotation.y = b * Math.PI / 8;
       shellNa.visible = !a && !lab.electrons;
+      pairToken.visible = Boolean(a) && lab.electrons < 2;
+      if (held.name === "pair") pairToken.position.set(held.x, held.y, 0.12); else pairToken.position.lerp(pairHome, 0.25);
+      bondHint.set(a ? (lab.electrons < 2 ? "Drag the electron pair onto an O–H bond" : "Both bonds formed") : lab.electrons ? "Electron transferred: Na⁺ and Cl⁻" : "Drag sodium's outer electron to chlorine");
       sodium.material.color.setHex(a ? 0xe0e9f2 : 0xab86da); chlorine.material.color.setHex(a ? 0xea615b : 0x4caf71);
       first.set(a ? "H" : lab.electrons ? "Na⁺" : "Na"); second.set(a ? "O" : lab.electrons ? "Cl⁻" : "Cl"); hydrogen.visible = third.sprite.visible = Boolean(a);
       bond1.visible = a ? lab.electrons >= 1 : false; bond2.visible = Boolean(a && lab.electrons >= 2);
       const spin = time * 0.9;
       electrons.forEach((electron, i) => { electron.visible = a ? i < 4 : true; if (a) electron.position.set(1.15 + Math.cos(i * 0.25 + 0.7 + spin) * 0.78, Math.sin(i * 0.25 + 0.7 + spin) * 0.78, 0); else if (i === 7 && !lab.electrons) electron.position.set(-1.15, -0.68, 0); else electron.position.set(1.15 + Math.cos(i * Math.PI / 4 + spin) * 0.78, Math.sin(i * Math.PI / 4 + spin) * 0.78, 0); });
+      if (held.name === "electron") electrons[7].position.set(held.x, held.y, 0.1);
       shared.forEach((electron, i) => { electron.visible = Boolean(a && i < lab.electrons * 2); electron.position.set((i < 2 ? (i % 2) * 0.18 - 0.09 : 0.52 + (i % 2) * 0.16) + Math.sin(time * 4 + i) * 0.03, (i < 2 ? 0 : -0.5) + Math.cos(time * 4 + i) * 0.03, 0.12); });
     });
   } else if (id === "seismic") {
@@ -291,16 +364,69 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       });
     });
   } else if (id === "earth-scale") {
-    const rings = earthLayers.map(l => mesh(new THREE.RingGeometry(l.inner / 6371 * 1.75, l.outer / 6371 * 1.75, 128), l.color));
-    const outline = line(Array.from({ length: 129 }, (_, i) => [Math.cos(i / 128 * Math.PI * 2) * 1.76, Math.sin(i / 128 * Math.PI * 2) * 1.76]), 0x647a8c);
-    const caption = label("", 0, 2.15, 5.4);
-    const atmosphere = mesh(new THREE.RingGeometry(1.79, 1.97, 96), 0x6fb7ff, 0, 0, -0.02, root, { opacity: 0.3, emissive: 0x3d8bff, emissiveIntensity: 0.7 });
-    const coreGlow = glow(0xff8a3d, 1.7); coreGlow.position.z = 0.1;
+    // A globe with a quarter cut away, so every layer shows on the two flat cut faces (radii to scale).
+    const R = 1.75;
+    const scale = R / 6371;
+    const cut = Math.PI / 2;
+    const phiStart = Math.PI / 2 + cut / 2; const phiLength = Math.PI * 2 - cut;
+    const globe = new THREE.Group(); globe.rotation.x = 0.32; root.add(globe);
+
+    // Surface: painted oceans and continents (generated, no image asset).
+    const earthCanvas = document.createElement("canvas"); earthCanvas.width = 1024; earthCanvas.height = 512;
+    const paint = earthCanvas.getContext("2d")!;
+    paint.fillStyle = "#1d5fa6"; paint.fillRect(0, 0, 1024, 512);
+    let seed = 11; const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let k = 0; k < 24; k++) {
+      const cx = random() * 1024; const cy = 90 + random() * 330; const size = 30 + random() * 70;
+      paint.fillStyle = random() > 0.35 ? "#4f9a4b" : "#8a7d43"; paint.beginPath();
+      for (let i = 0; i <= 14; i++) { const angle = i / 14 * Math.PI * 2; const radius = size * (0.6 + random() * 0.7); const x = cx + Math.cos(angle) * radius; const y = cy + Math.sin(angle) * radius * 0.7; if (i) paint.lineTo(x, y); else paint.moveTo(x, y); }
+      paint.closePath(); paint.fill();
+    }
+    paint.fillStyle = "#eef4f8"; paint.fillRect(0, 0, 1024, 26); paint.fillRect(0, 486, 1024, 26);
+    const surface = new THREE.CanvasTexture(earthCanvas); surface.colorSpace = THREE.SRGBColorSpace;
+
+    // Solid shells for each compositional layer, built from the center outward.
+    const buildOrder = [5, 4, 3, 0];
+    const shells = earthLayers.map((layer, index) => {
+      const shell = new THREE.Mesh(new THREE.SphereGeometry(layer.outer * scale, 56, 40, phiStart, phiLength), new THREE.MeshStandardMaterial({ color: index === 0 ? 0xffffff : layer.color, map: index === 0 ? surface : null, roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide }));
+      registry.push(shell); globe.add(shell); return shell;
+    });
+    // Flat cut faces: a half ring per layer on each of the two cut planes.
+    const cutAngles = [Math.PI / 2 - cut / 2, Math.PI / 2 + cut / 2];
+    const faces = earthLayers.map((layer, index) => cutAngles.map(angle => {
+      const face = mesh(new THREE.RingGeometry(layer.inner * scale, layer.outer * scale, 56, 1, -Math.PI / 2, Math.PI), layer.color, 0, 0, 0, globe, { roughness: 0.55, emissive: index >= 4 ? layer.color : undefined, emissiveIntensity: 0.22 });
+      face.rotation.y = Math.PI + angle;
+      if (index === 1 || index === 2) { face.material.polygonOffset = true; face.material.polygonOffsetFactor = -2; face.material.polygonOffsetUnits = -2; }
+      return face;
+    }));
+    const ghost = mesh(new THREE.SphereGeometry(R, 32, 22), 0x9fb4c9, 0, 0, 0, globe, { opacity: 0.1, roughness: 0.4 });
+    const air = mesh(new THREE.SphereGeometry(R * 1.06, 40, 28), 0x6fb7ff, 0, 0, 0, globe, { opacity: 0.16, emissive: 0x3d8bff, emissiveIntensity: 0.5 }); air.material.side = THREE.BackSide;
+    const caption = label("", 0, 2.3, 5.4);
+
+    // Surface-detail view: a slab of the top 350 km, drawn as a 3D block.
     const detail = new THREE.Group(); root.add(detail);
-    const surface = [0, 35, 100, 350];
-    for (let i = 0; i < 3; i++) { const top = 1.5 - surface[i] / 100; const bottom = 1.5 - surface[i + 1] / 100; mesh(new THREE.PlaneGeometry(2.3, top - bottom), earthLayers[i].color, -0.9, (top + bottom) / 2, 0, detail); label(`${surface[i]}–${surface[i + 1]} km`, 1.2, (top + bottom) / 2, 2.1, detail); }
+    const depths = [0, 35, 100, 350];
+    for (let i = 0; i < 3; i++) { const top = 1.5 - depths[i] / 100; const bottom = 1.5 - depths[i + 1] / 100; mesh(new THREE.BoxGeometry(2.3, top - bottom, 0.7), earthLayers[i].color, -0.9, (top + bottom) / 2, 0, detail, { roughness: 0.65 }); label(`${depths[i]}–${depths[i + 1]} km`, 1.2, (top + bottom) / 2, 2.1, detail); }
     label("Crust / rigid mantle / asthenosphere", 0, -2.3, 5.2, detail);
-    updates.push((time, a, b, lab) => { outline.visible = !a; atmosphere.visible = !a; coreGlow.material.opacity = !a && lab.layers > 0 ? 0.32 + 0.14 * Math.sin(time * 2) : 0; detail.visible = Boolean(a); rings.forEach((ring, i) => { const order = [5, 4, 3, 0].indexOf(i); ring.visible = !a && (order >= 0 ? order < lab.layers : lab.layers === 4 && i === b); ring.position.z = i === 1 || i === 2 ? 0.05 : 0; ring.material.emissive.setHex(i === b ? 0x443322 : 0); ring.material.emissiveIntensity = i === b ? 0.7 + 0.5 * Math.sin(time * 3) : 1; }); caption.set(lab.layers === 0 && !a ? "Add layers from the center outward" : `${earthLayers[b].name}: ${earthLayers[b].depth}`); });
+    updates.push((time, a, b, lab) => {
+      globe.visible = !a; detail.visible = Boolean(a);
+      globe.rotation.y = Math.sin(time * 0.45) * 0.28;
+      const complete = lab.layers === 4;
+      air.visible = complete; ghost.visible = !complete;
+      earthLayers.forEach((_, i) => {
+        const order = buildOrder.indexOf(i);
+        const built = order >= 0 && order < lab.layers;
+        shells[i].visible = built;
+        const overlay = i === 1 || i === 2;
+        const selected = i === b;
+        faces[i].forEach(face => {
+          face.visible = overlay ? complete && selected : built;
+          face.material.emissive.setHex(selected ? 0x554422 : i >= 4 ? earthLayers[i].color : 0);
+          face.material.emissiveIntensity = selected ? 0.7 + 0.5 * Math.sin(time * 3) : 0.22;
+        });
+      });
+      caption.set(lab.layers === 0 && !a ? "Add layers from the center outward" : `${earthLayers[b].name}: ${earthLayers[b].depth}`);
+    });
   } else if (id === "replication" || id === "mutation") {
     const colors: Record<string, number> = { A: 0x3ea870, T: 0xd76164, C: 0x408bd0, G: 0xd8b238, "": 0x9caaba };
     const count = id === "replication" ? 24 : 25;
@@ -325,7 +451,7 @@ export function createExperimentScene(root: THREE.Group, id: string) {
   const setLite = () => registry.forEach(item => {
     const old = item.material as THREE.MeshStandardMaterial;
     if (!old.isMeshStandardMaterial) return;
-    item.material = new THREE.MeshLambertMaterial({ color: old.color, emissive: old.emissive, emissiveIntensity: old.emissiveIntensity, transparent: old.transparent, opacity: old.opacity, depthWrite: old.depthWrite, side: old.side });
+    item.material = new THREE.MeshLambertMaterial({ color: old.color, map: old.map, emissive: old.emissive, emissiveIntensity: old.emissiveIntensity, transparent: old.transparent, opacity: old.opacity, depthWrite: old.depthWrite, side: old.side });
     old.dispose();
   });
   return Object.assign(run, { setLite, interact });
