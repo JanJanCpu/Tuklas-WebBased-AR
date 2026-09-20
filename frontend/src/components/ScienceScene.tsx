@@ -71,7 +71,8 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
     presentationRoot.add(modelRoot);
 
     scene.add(new THREE.HemisphereLight(0xffffff, 0x24324d, 1.1));
-    scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.45);
+    scene.add(ambientLight);
     const keyLight = new THREE.DirectionalLight(0xfff4e0, 2.4);
     keyLight.position.set(3, 5, 4);
     scene.add(keyLight);
@@ -81,6 +82,38 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
     const contentRoot = new THREE.Group();
     billboardRoot.add(contentRoot);
     const updateExperiment = createExperimentScene(contentRoot, moduleId);
+
+    // Quality levels: 0 full, 1 lower resolution, 2 also simple shading. Steps down by itself on a struggling phone.
+    const forcedQuality = new URLSearchParams(window.location.search).get("q");
+    let quality = 0;
+    let qFrames = 0;
+    let qStart = performance.now();
+    let qWindows = 0;
+    let lowWindows = 0;
+    const applyQuality = (level: number) => {
+      if (level === quality) return;
+      quality = level;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, level >= 1 ? 1 : 1.5));
+      if (level >= 2) { scene.environment = null; ambientLight.intensity = 0.95; updateExperiment.setLite(); }
+    };
+    let storedQuality = 0;
+    try { storedQuality = Number(localStorage.getItem("tuklas-quality")) || 0; } catch { /* storage unavailable */ }
+    applyQuality(Math.min(2, forcedQuality !== null ? Number(forcedQuality) || 0 : storedQuality));
+    const watchFrameRate = (now: number) => {
+      qFrames += 1;
+      const elapsed = now - qStart;
+      if (elapsed < 1000) return;
+      const fps = qFrames * 1000 / elapsed;
+      qFrames = 0; qStart = now;
+      if (elapsed > 2500) return; // tab was hidden; not a real reading
+      qWindows += 1;
+      if (forcedQuality !== null || quality >= 2 || qWindows <= 3) return;
+      lowWindows = fps < 19 ? lowWindows + 1 : 0;
+      if (lowWindows < 3) return;
+      lowWindows = 0; qWindows = 0;
+      applyQuality(quality + 1);
+      try { localStorage.setItem("tuklas-quality", String(quality)); } catch { /* storage unavailable */ }
+    };
     let elapsed = 0;
     let previousTime = performance.now();
     let previousInputs = "";
@@ -139,7 +172,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
         renderFps = Math.round(frames * 1000 / (now - statsAt));
         detectFps = Math.round(detects * 1000 / (now - statsAt));
         frames = 0; detects = 0; statsAt = now;
-        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState} | b5`;
+        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState} | q${quality} | b6`;
       }
     };
 
@@ -165,6 +198,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
 
     const render = () => {
       const now = performance.now();
+      watchFrameRate(now);
       if (handsEnabled || fpsEnabled) tickHands(now);
       const current = valuesRef.current;
       const inputs = JSON.stringify(current);

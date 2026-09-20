@@ -7,11 +7,14 @@ interface Finish { roughness?: number; metalness?: number; emissive?: number; em
 /** All experiment content fits the same six-unit presentation area in AR and 3D. */
 export function createExperimentScene(root: THREE.Group, id: string) {
   const updates: ((time: number, a: number, b: number, lab: LabState) => void)[] = [];
+  // Every lit mesh, so the whole scene can switch to cheaper shading on weak phones.
+  const registry: THREE.Mesh[] = [];
   const mesh = (geometry: THREE.BufferGeometry, color: number, x = 0, y = 0, z = 0, parent: THREE.Object3D = root, finish: Finish = {}) => {
     const material = new THREE.MeshStandardMaterial({ color, roughness: finish.roughness ?? 0.5, metalness: finish.metalness ?? 0.05, side: THREE.DoubleSide });
     if (finish.emissive !== undefined) { material.emissive.setHex(finish.emissive); material.emissiveIntensity = finish.emissiveIntensity ?? 1; }
     if (finish.opacity !== undefined) { material.transparent = true; material.opacity = finish.opacity; material.depthWrite = false; }
     const item = new THREE.Mesh(geometry, material);
+    registry.push(item);
     item.position.set(x, y, z); parent.add(item); return item;
   };
   const sphere = (color: number, x: number, y: number, r = 0.13, parent: THREE.Object3D = root, finish: Finish = {}) => mesh(new THREE.SphereGeometry(r, 20, 12), color, x, y, 0, parent, finish);
@@ -21,14 +24,14 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     if (finish.emissive !== undefined) { material.emissive.setHex(finish.emissive); material.emissiveIntensity = finish.emissiveIntensity ?? 1; }
     if (finish.opacity !== undefined) { material.transparent = true; material.opacity = finish.opacity; material.depthWrite = false; }
     const item = new THREE.InstancedMesh(geometry, material, count);
-    item.frustumCulled = false; parent.add(item);
+    item.frustumCulled = false; parent.add(item); registry.push(item);
     const dummy = new THREE.Object3D();
     const place = (index: number, x: number, y: number, z: number, scaleX: number, scaleY = scaleX, scaleZ = scaleX) => {
       dummy.position.set(x, y, z); dummy.scale.set(scaleX, scaleY, scaleZ); dummy.updateMatrix();
       item.setMatrixAt(index, dummy.matrix); item.instanceMatrix.needsUpdate = true;
     };
     const hide = (index: number) => place(index, 0, 0, 0, 0);
-    return { item, material, place, hide };
+    return { item, get material() { return item.material as THREE.MeshStandardMaterial; }, place, hide };
   };
   const line = (points: number[][], color = 0x486480, parent: THREE.Object3D = root) => {
     const item = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points.map(p => new THREE.Vector3(p[0], p[1], p[2] || 0))), new THREE.LineBasicMaterial({ color })); parent.add(item); return item;
@@ -252,5 +255,13 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       }
     });
   } else throw new Error(`Unknown experiment: ${id}`);
-  return (time: number, a: number, b: number, lab: LabState) => updates.forEach(update => update(time, a, b, lab));
+  const run = (time: number, a: number, b: number, lab: LabState) => updates.forEach(update => update(time, a, b, lab));
+  // Lambert shading skips the reflections and specular math that weak GPUs struggle with.
+  const setLite = () => registry.forEach(item => {
+    const old = item.material as THREE.MeshStandardMaterial;
+    if (!old.isMeshStandardMaterial) return;
+    item.material = new THREE.MeshLambertMaterial({ color: old.color, emissive: old.emissive, emissiveIntensity: old.emissiveIntensity, transparent: old.transparent, opacity: old.opacity, depthWrite: old.depthWrite, side: old.side });
+    old.dispose();
+  });
+  return Object.assign(run, { setLite });
 }
