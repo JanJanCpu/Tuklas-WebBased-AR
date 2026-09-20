@@ -164,8 +164,11 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     const bulbGlows = bulbs.map(bulb => glow(0xffc84a, 1.9, bulb));
     bulbs.forEach(bulb => mesh(new THREE.CylinderGeometry(0.13, 0.11, 0.16, 14), 0x9aa6b3, 0, -0.3, 0, bulb, { metalness: 0.9, roughness: 0.3 }));
     const bulbLabels = bulbs.map((_, i) => label(`Bulb ${i + 1}`, -1.5 + i * 1.5, 1.15, 1.25, root, 4));
-    const batteries = [0, 1, 2].map(i => mesh(new THREE.BoxGeometry(0.42, 0.35, 0.2), 0x344a65, -0.52 + i * 0.52, -1.15, 0, root, { roughness: 0.35, metalness: 0.3 }));
-    batteries.forEach(battery => mesh(new THREE.BoxGeometry(0.12, 0.06, 0.1), 0xd3dae2, 0, 0.2, 0, battery, { metalness: 0.9, roughness: 0.2 }));
+    const batteries = [0, 1, 2].map(i => mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.5, 18), 0x344a65, -0.52 + i * 0.52, -1.15, 0, root, { roughness: 0.35, metalness: 0.3 }));
+    batteries.forEach(battery => {
+      mesh(new THREE.CylinderGeometry(0.135, 0.135, 0.05, 18), 0xe8b92e, 0, -0.1, 0, battery, { metalness: 0.7, roughness: 0.3 });
+      mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.06, 10), 0xd3dae2, 0, 0.28, 0, battery, { metalness: 0.9, roughness: 0.2 });
+    });
     const batteryLabel = label("", 0, -1.62, 3);
     const switchLabel = label("", 0, 1.7, 4);
     const electrons = instanced(new THREE.SphereGeometry(0.065, 8, 6), 0x00a7e6, 24, root, { emissive: 0x00a7e6, emissiveIntensity: 1.4, roughness: 0.3 });
@@ -200,7 +203,19 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       for (let i = 0; i < 24; i++) { if (!(c.current > 0 && paths.length > 0)) { electrons.hide(i); continue; } const path = paths[i % paths.length]; const progress = ((time * c.branchCurrent * 0.45 + i / 24) % 1) * (path.length - 1); const segment = Math.floor(progress); electronAt.copy(path[segment]).lerp(path[segment + 1], progress - segment); electrons.place(i, electronAt.x, electronAt.y, electronAt.z, 1); }
     });
   } else if (id === "chemical-change") {
+    mesh(new RoundedBoxGeometry(4.2, 0.14, 1.2, 2, 0.04), 0x9b7548, 0, -0.9, 0, root, { roughness: 0.7 });
     mesh(new THREE.CylinderGeometry(0.82, 0.82, 0.06, 32), 0xbfe3ef, 0, -0.8, 0, root, { opacity: 0.55, roughness: 0.05 });
+    [-0.5, -0.2, 0.1, 0.4].forEach(y => mesh(new THREE.BoxGeometry(0.3, 0.014, 0.02), 0x35566b, 0, y, 0.88));
+    // Vinegar bottle on the left, baking soda jar on the right.
+    const bottle = new THREE.Group(); bottle.position.set(-1.6, -0.83, 0); root.add(bottle);
+    mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.9, 20), 0xc9863b, 0, 0.45, 0, bottle, { opacity: 0.88, roughness: 0.15 });
+    mesh(new THREE.CylinderGeometry(0.1, 0.16, 0.3, 14), 0xc9863b, 0, 1.05, 0, bottle, { opacity: 0.88, roughness: 0.15 });
+    mesh(new THREE.CylinderGeometry(0.115, 0.115, 0.1, 14), 0xf4f7fa, 0, 1.25, 0, bottle, { roughness: 0.4 });
+    mesh(new THREE.BoxGeometry(0.36, 0.34, 0.02), 0xf4f7fa, 0, 0.42, 0.285, bottle, { roughness: 0.5 });
+    const jarSoda = new THREE.Group(); jarSoda.position.set(1.6, -0.83, 0); root.add(jarSoda);
+    mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.6, 22), 0xf2f2ee, 0, 0.3, 0, jarSoda, { roughness: 0.35 });
+    mesh(new THREE.CylinderGeometry(0.315, 0.315, 0.1, 22), 0x2f6fb0, 0, 0.65, 0, jarSoda, { roughness: 0.4 });
+    mesh(new THREE.BoxGeometry(0.4, 0.22, 0.02), 0x2f6fb0, 0, 0.3, 0.305, jarSoda, { roughness: 0.5 });
     const jar = mesh(new THREE.CylinderGeometry(0.9, 0.8, 1.6, 32, 1, true), 0x9fd8ea, 0, 0, 0, root, { opacity: 0.2, roughness: 0.04, metalness: 0.1 });
     const rim = mesh(new THREE.TorusGeometry(0.9, 0.03, 8, 40), 0xd6eef7, 0, 0.8, 0, root, { opacity: 0.7, roughness: 0.1 }); rim.rotation.x = Math.PI / 2;
     void jar;
@@ -228,9 +243,12 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     const first = label("Na", -1.15, 0.95, 0.9, root, 2); const second = label("Cl", 1.15, 0.95, 0.9, root, 2); const third = label("H", 0, -1.5, 0.6, root, 2);
     const electrons = Array.from({ length: 8 }, () => sphere(0xffca28, 0, 0, 0.07, root, { emissive: 0xffa000, emissiveIntensity: 0.9 }));
     const shared = Array.from({ length: 4 }, () => sphere(0xffca28, 0, 0, 0.07, root, { emissive: 0xffa000, emissiveIntensity: 0.9 }));
+    const shellCl = mesh(new THREE.TorusGeometry(0.78, 0.012, 6, 64), 0x9fb4c9, 1.15, 0, 0, root, { opacity: 0.55 });
+    const shellNa = mesh(new THREE.TorusGeometry(0.68, 0.012, 6, 64), 0x9fb4c9, -1.15, 0, 0, root, { opacity: 0.55 });
     const bond1 = line([[-1.15, 0], [1.15, 0]], 0x567890); const bond2 = line([[1.15, 0], [0, -1]], 0x567890);
     updates.push((time, a, b, lab) => {
       root.rotation.y = b * Math.PI / 8;
+      shellNa.visible = !a && !lab.electrons;
       sodium.material.color.setHex(a ? 0xe0e9f2 : 0xab86da); chlorine.material.color.setHex(a ? 0xea615b : 0x4caf71);
       first.set(a ? "H" : lab.electrons ? "Na⁺" : "Na"); second.set(a ? "O" : lab.electrons ? "Cl⁻" : "Cl"); hydrogen.visible = third.sprite.visible = Boolean(a);
       bond1.visible = a ? lab.electrons >= 1 : false; bond2.visible = Boolean(a && lab.electrons >= 2);
@@ -243,7 +261,23 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     const front = mesh(new THREE.PlaneGeometry(0.45, 1.5), 0xffffff, 0, 0, -0.12, root, { opacity: 0.14, emissive: 0xffffff, emissiveIntensity: 0.3 });
     const particles = Array.from({ length: 36 }, (_, i) => sphere(0xffd454, -2.1 + (i % 12) * 0.38, -0.45 + Math.floor(i / 12) * 0.45, 0.06, root, { emissive: 0xffa000, emissiveIntensity: 0.5 }));
     const wave = label("", 0, 1.2, 4.5); label("Travel direction →", 0, -1.1, 3.5);
+    // A hammer strikes the left edge once per wave, and a seismograph at the far end draws what arrives.
+    const hammer = new THREE.Group(); hammer.position.set(-2.55, 0.85, 0); root.add(hammer);
+    mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.7, 8), 0x8a6a4a, 0, -0.35, 0, hammer);
+    mesh(new THREE.BoxGeometry(0.3, 0.22, 0.22), 0x59636e, 0, -0.72, 0, hammer, { metalness: 0.8, roughness: 0.3 });
+    mesh(new RoundedBoxGeometry(4.8, 0.8, 0.08, 2, 0.03), 0x0f1c2e, 0, -1.8, -0.1, root, { roughness: 0.8 });
+    label("Seismograph at the far end", 0, -2.38, 3, root, 9);
+    const traceValues = new Float32Array(80 * 3);
+    for (let j = 0; j < 80; j++) { traceValues[j * 3] = -2.25 + j * 0.0575; traceValues[j * 3 + 2] = -0.04; }
+    const traceAttribute = new THREE.BufferAttribute(traceValues, 3);
+    const traceGeometry = new THREE.BufferGeometry(); traceGeometry.setAttribute("position", traceAttribute);
+    root.add(new THREE.Line(traceGeometry, new THREE.LineBasicMaterial({ color: 0x5cff9d })));
+    line([[-2.3, -1.8, -0.04], [2.3, -1.8, -0.04]], 0x2c4a63);
     updates.push((time, a, b) => {
+      const speed = a ? 0.45 : 0.75; const phase = (time * speed) % 1;
+      hammer.rotation.z = phase < 0.7 ? -0.9 * (phase / 0.7) : -0.9 * (1 - (phase - 0.7) / 0.3);
+      for (let j = 0; j < 80; j++) { const t = time - (79 - j) * 0.03; traceValues[j * 3 + 1] = -1.8 + (a && b || t < 0 ? 0 : Math.sin(2.1 * 4 - t * (a ? 4 : 7)) * 0.34); }
+      traceAttribute.needsUpdate = true;
       wave.set(a && b ? "S-wave blocked by liquid" : a ? "S-wave: transverse displacement" : "P-wave: compression and expansion");
       medium.material.color.setHex(b ? 0x2f6f9d : 0x6b5443);
       const blocked = Boolean(a && b);
@@ -260,11 +294,13 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     const rings = earthLayers.map(l => mesh(new THREE.RingGeometry(l.inner / 6371 * 1.75, l.outer / 6371 * 1.75, 128), l.color));
     const outline = line(Array.from({ length: 129 }, (_, i) => [Math.cos(i / 128 * Math.PI * 2) * 1.76, Math.sin(i / 128 * Math.PI * 2) * 1.76]), 0x647a8c);
     const caption = label("", 0, 2.15, 5.4);
+    const atmosphere = mesh(new THREE.RingGeometry(1.79, 1.97, 96), 0x6fb7ff, 0, 0, -0.02, root, { opacity: 0.3, emissive: 0x3d8bff, emissiveIntensity: 0.7 });
+    const coreGlow = glow(0xff8a3d, 1.7); coreGlow.position.z = 0.1;
     const detail = new THREE.Group(); root.add(detail);
     const surface = [0, 35, 100, 350];
     for (let i = 0; i < 3; i++) { const top = 1.5 - surface[i] / 100; const bottom = 1.5 - surface[i + 1] / 100; mesh(new THREE.PlaneGeometry(2.3, top - bottom), earthLayers[i].color, -0.9, (top + bottom) / 2, 0, detail); label(`${surface[i]}–${surface[i + 1]} km`, 1.2, (top + bottom) / 2, 2.1, detail); }
     label("Crust / rigid mantle / asthenosphere", 0, -2.3, 5.2, detail);
-    updates.push((time, a, b, lab) => { outline.visible = !a; detail.visible = Boolean(a); rings.forEach((ring, i) => { const order = [5, 4, 3, 0].indexOf(i); ring.visible = !a && (order >= 0 ? order < lab.layers : lab.layers === 4 && i === b); ring.position.z = i === 1 || i === 2 ? 0.05 : 0; ring.material.emissive.setHex(i === b ? 0x443322 : 0); ring.material.emissiveIntensity = i === b ? 0.7 + 0.5 * Math.sin(time * 3) : 1; }); caption.set(lab.layers === 0 && !a ? "Add layers from the center outward" : `${earthLayers[b].name}: ${earthLayers[b].depth}`); });
+    updates.push((time, a, b, lab) => { outline.visible = !a; atmosphere.visible = !a; coreGlow.material.opacity = !a && lab.layers > 0 ? 0.32 + 0.14 * Math.sin(time * 2) : 0; detail.visible = Boolean(a); rings.forEach((ring, i) => { const order = [5, 4, 3, 0].indexOf(i); ring.visible = !a && (order >= 0 ? order < lab.layers : lab.layers === 4 && i === b); ring.position.z = i === 1 || i === 2 ? 0.05 : 0; ring.material.emissive.setHex(i === b ? 0x443322 : 0); ring.material.emissiveIntensity = i === b ? 0.7 + 0.5 * Math.sin(time * 3) : 1; }); caption.set(lab.layers === 0 && !a ? "Add layers from the center outward" : `${earthLayers[b].name}: ${earthLayers[b].depth}`); });
   } else if (id === "replication" || id === "mutation") {
     const colors: Record<string, number> = { A: 0x3ea870, T: 0xd76164, C: 0x408bd0, G: 0xd8b238, "": 0x9caaba };
     const count = id === "replication" ? 24 : 25;
