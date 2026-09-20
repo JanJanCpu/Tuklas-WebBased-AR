@@ -83,6 +83,13 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
     billboardRoot.add(contentRoot);
     const updateExperiment = createExperimentScene(contentRoot, moduleId);
 
+    // Diagnostics: ?empty=1 hides the model (measures AR tracking alone); ?detect=2 analyzes the camera every 2nd frame.
+    const urlParams = new URLSearchParams(window.location.search);
+    const emptyScene = urlParams.has("empty");
+    const detectEvery = Math.max(1, Number(urlParams.get("detect")) || 1);
+    let arFrame = 0;
+    if (emptyScene) modelRoot.visible = false;
+
     // Quality levels: 0 full, 1 lower resolution, 2 also simple shading. Steps down by itself on a struggling phone.
     const forcedQuality = new URLSearchParams(window.location.search).get("q");
     let quality = 0;
@@ -172,7 +179,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
         renderFps = Math.round(frames * 1000 / (now - statsAt));
         detectFps = Math.round(detects * 1000 / (now - statsAt));
         frames = 0; detects = 0; statsAt = now;
-        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState} | q${quality} | b6`;
+        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState} | q${quality} d${detectEvery}${emptyScene ? " empty" : ""} | b7`;
       }
     };
 
@@ -205,9 +212,10 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
       if (inputs !== previousInputs) { elapsed = 0; previousInputs = inputs; }
       if (viewMode === "fallback" || markerVisible) elapsed += Math.min(0.05, (now - previousTime) / 1000);
       previousTime = now;
-      updateExperiment(elapsed, current.controlA, current.controlB, current.lab);
+      if (!emptyScene) updateExperiment(elapsed, current.controlA, current.controlB, current.lab);
       if (viewMode === "ar" && arSource?.ready && arContext) {
-        arContext.update(arSource.domElement);
+        arFrame += 1;
+        if (arFrame % detectEvery === 0) arContext.update(arSource.domElement);
         if (trackedRoot.visible) {
           missedFrames = 0;
           presentationRoot.visible = true;
