@@ -363,36 +363,50 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     root.add(new THREE.Line(traceGeometry, new THREE.LineBasicMaterial({ color: 0x5cff9d })));
     line([[-2.3, -1.8, -0.04], [2.3, -1.8, -0.04]], 0x2c4a63);
 
-    const strikes: { t: number; amp: number }[] = [];
-    let lastTime = -1; let stationX = 1.9; let autoOn = true;
+    const strikes: { t: number; amp: number; swingStart?: number; pull?: number; windStart?: number; windFrom?: number }[] = [];
+    let lastTime = -1; let stationX = 1.9; let autoOn = true; let period = 2.2;
+    // When the next automatic strike lands (null when auto strike is off). The hammer winds up, swings and recoils around each one.
+    let nextStrike: number | null = 1.6;
     const autoLabel = label("Auto strike: ON", -1.6, 2.02, 2.4, root, 7);
     const held = { name: "", angle: 0 };
-    const grabStart = new THREE.Vector3();
-    const swing = { start: -10, from: 0 };
+    const grabStart = new THREE.Vector3(); let grabBase = 0;
     interact = {
       targets: { hammer, station, rock: medium, waves: wave.sprite, auto: autoLabel.sprite },
-      down: (name, point) => { held.name = name === "hammer" || name === "station" ? name : ""; held.angle = 0; grabStart.copy(point); },
+      // Start from wherever the hammer is right now, so grabbing it mid wind-up does not snap it.
+      down: (name, point) => { held.name = name === "hammer" || name === "station" ? name : ""; grabBase = hammer.rotation.z; held.angle = grabBase; grabStart.copy(point); },
       move: (name, point) => {
         // Pulling left, or down and left, from wherever you grabbed it winds the hammer back.
-        if (name === "hammer") held.angle = -1.25 * Math.max(0, Math.min(1, ((grabStart.x - point.x) + 0.5 * (grabStart.y - point.y)) / 0.9));
+        if (name === "hammer") held.angle = Math.max(-1.25, Math.min(0, grabBase - 1.25 * ((grabStart.x - point.x) + 0.5 * (grabStart.y - point.y)) / 0.9));
         else if (name === "station") stationX = Math.max(-1.7, Math.min(2.1, point.x));
       },
       up: (name, _point, moved, api) => {
-        if (name === "hammer") { const pull = moved < 8 ? 0.6 : Math.abs(held.angle); strikes.push({ t: lastTime + 0.12, amp: 0.5 + 0.8 * Math.min(1, pull / 1.2) }); swing.start = lastTime; swing.from = Math.max(0.5, pull); }
+        if (name === "hammer") {
+          let hitAt: number;
+          if (moved >= 8) {
+            // Released after pulling back: swing from exactly where the finger left it.
+            const pull = Math.max(0.3, Math.abs(held.angle)); hitAt = lastTime + 0.16;
+            strikes.push({ t: hitAt, amp: 0.5 + 0.8 * Math.min(1, pull / 1.2), swingStart: lastTime, pull });
+          } else {
+            // A tap: wind up quickly from the current pose, then swing.
+            hitAt = lastTime + 0.4;
+            strikes.push({ t: hitAt, amp: 0.9, windStart: lastTime, windFrom: hammer.rotation.z, swingStart: lastTime + 0.18, pull: 0.6 });
+          }
+          if (strikes.length > 4) strikes.shift();
+          nextStrike = autoOn ? hitAt + period : null;
+        }
         else if (name === "rock" && moved < 8) api.setControl("b", 1 - api.values().b);
         else if (name === "waves" && moved < 8) api.setControl("a", 1 - api.values().a);
-        else if (name === "auto" && moved < 8) autoOn = !autoOn;
+        else if (name === "auto" && moved < 8) { autoOn = !autoOn; nextStrike = autoOn ? lastTime + 1.2 : null; }
         held.name = "";
       },
       cancel: () => { held.name = ""; },
     };
     updates.push((time, a, b) => {
-      const PERIOD = a ? 3.6 : 2.2;
+      period = a ? 3.6 : 2.2;
       autoLabel.set(autoOn ? "Auto strike: ON" : "Auto strike: OFF");
-      if (time < lastTime - 0.01 || !strikes.length) { strikes.length = 0; strikes.push({ t: 0.6, amp: 1 }); }
+      if (time < lastTime - 0.01) { strikes.length = 0; nextStrike = autoOn ? 1.6 : null; }
       lastTime = time;
-      const newest = strikes[strikes.length - 1];
-      if (autoOn && time > newest.t + PERIOD) { strikes.push({ t: newest.t + PERIOD, amp: 1 }); if (strikes.length > 3) strikes.shift(); }
+      if (nextStrike !== null && time >= nextStrike) { strikes.push({ t: nextStrike, amp: 1, swingStart: nextStrike - 0.3, pull: 0.9 }); if (strikes.length > 4) strikes.shift(); nextStrike = autoOn ? nextStrike + period : null; }
       const blocked = Boolean(a && b);
       const K = 5; const speed = a ? 1.0 : 1.75; const freq = K * speed;
       const field = (x: number, t: number) => strikes.reduce((sum, hit) => {
@@ -417,11 +431,26 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       rows.forEach(attribute => { attribute.needsUpdate = true; });
       fronts.forEach((front, k) => { const hit = strikes[strikes.length - 1 - k]; const x = hit ? X0 + speed * (time - hit.t) : 99; front.visible = Boolean(hit) && x > X0 && x < 2.4 && !(blocked && x > X0 + 0.7); front.position.x = x; });
       // Sparks fly out where the hammer lands.
-      const recent = strikes[strikes.length - 1]; const spark = time - recent.t;
+      const recent = strikes[strikes.length - 1]; const spark = recent ? time - recent.t : -1;
       for (let i = 0; i < 10; i++) { if (spark < 0 || spark > 0.5) { sparks.hide(i); continue; } const ang = (i / 10) * Math.PI - Math.PI / 2; sparks.place(i, X0 + 0.05 + Math.cos(ang) * spark * 0.9, Math.sin(ang) * spark * 1.1, 0.12, 1 - spark / 0.5); }
       // Hammer: follows the finger while held, swings after release, and otherwise winds up just before each automatic strike.
-      const nextAuto = autoOn ? recent.t + PERIOD : Infinity; const wind = (time - (nextAuto - 0.8)) / 0.7;
-      hammer.rotation.z = held.name === "hammer" ? held.angle : time - swing.start < 0.12 ? -swing.from * (1 - (time - swing.start) / 0.12) : wind > 0 && wind < 1 ? -0.9 * wind : 0;
+      // Each strike: slow wind-up, an accelerating swing that lands exactly on the strike time, then a small recoil off the rock.
+      let angle = 0;
+      for (const hit of strikes) {
+        if (hit.windStart !== undefined && hit.windFrom !== undefined && hit.swingStart !== undefined && hit.pull !== undefined && time >= hit.windStart && time < hit.swingStart) {
+          const u = (time - hit.windStart) / (hit.swingStart - hit.windStart);
+          angle = Math.min(angle, hit.windFrom + (-hit.pull - hit.windFrom) * (u < 0.5 ? 2 * u * u : 1 - ((-2 * u + 2) ** 2) / 2));
+        }
+        if (hit.swingStart !== undefined && hit.pull !== undefined && time >= hit.swingStart && time <= hit.t) angle = Math.min(angle, -hit.pull * (1 - ((time - hit.swingStart) / (hit.t - hit.swingStart)) ** 2));
+        const since = time - hit.t;
+        if (since > 0 && since < 0.3) { const v = since / 0.3; angle = Math.min(angle, -0.22 * Math.sin(Math.PI * v) * (1 - v)); }
+      }
+      if (nextStrike !== null) {
+        const windStart = nextStrike - 1.1; const swingStart = nextStrike - 0.3;
+        if (time >= windStart && time < swingStart) { const u = (time - windStart) / (swingStart - windStart); angle = Math.min(angle, -0.9 * (u < 0.5 ? 2 * u * u : 1 - ((-2 * u + 2) ** 2) / 2)); }
+        else if (time >= swingStart && time <= nextStrike) angle = Math.min(angle, -0.9 * (1 - ((time - swingStart) / 0.3) ** 2));
+      }
+      hammer.rotation.z = held.name === "hammer" ? held.angle : angle;
       station.position.set(stationX, 0.98, 0.1);
       const arrival = (stationX - X0) / speed;
       readout.set(held.name === "hammer" ? `Pull back, then let go · power ${Math.round(Math.abs(held.angle) / 1.25 * 100)}%` : blocked ? "No S-wave reaches the station" : `Station ${(stationX - X0).toFixed(1)} away · pulse arrives after ${arrival.toFixed(1)} s`);
