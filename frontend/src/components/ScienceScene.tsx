@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { ViewMode } from "../types/domain";
 import { createExperimentScene } from "./experimentScene";
-import type { LabState } from "../lib/experiments";
+import { controls, type LabState } from "../lib/experiments";
 import { loadArToolkit } from "../lib/arjs";
 import { createHandTracker, type HandSample, type HandTracker } from "../lib/handTracking";
 
@@ -17,6 +17,8 @@ interface ScienceSceneProps {
   viewMode: ViewMode;
   onArReady?: (ready: boolean) => void;
   onArStatus?: (status: string) => void;
+  /** Called when the student changes a variable by touching the model instead of using the slider. */
+  onControlChange?: (which: "a" | "b", value: number) => void;
 }
 
 const cameraParametersUrl = "/assets/camera_para.dat";
@@ -24,10 +26,12 @@ const tuklasMarkerUrl = "/assets/tuklas-marker.patt";
 const HAND_INTERVAL_MS = 66;
 const HAND_SEARCH_INTERVAL_MS = 250;
 
-export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, viewMode, onArReady, onArStatus, onMarkerChange }: ScienceSceneProps) {
+export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, viewMode, onArReady, onArStatus, onMarkerChange, onControlChange }: ScienceSceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const valuesRef = useRef({ controlA, controlB, lab, trialPulse });
   valuesRef.current = { controlA, controlB, lab, trialPulse };
+  const controlChangeRef = useRef(onControlChange);
+  controlChangeRef.current = onControlChange;
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -136,6 +140,87 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
     let hasStablePose = false;
     let missedFrames = 0;
 
+    // Touch and mouse manipulation for scenes that expose grabbable parts (see Interaction in experimentScene).
+    const interact = updateExperiment.interact;
+    mount.style.pointerEvents = interact ? "auto" : "";
+    mount.style.touchAction = interact ? "pan-y" : "";
+    const inputCleanup: (() => void)[] = [];
+    if (interact) {
+      const ranges = controls[moduleId as keyof typeof controls];
+      const raycaster = new THREE.Raycaster();
+      const pointer = new THREE.Vector2();
+      const plane = new THREE.Plane();
+      const planeNormal = new THREE.Vector3();
+      const planeOrigin = new THREE.Vector3();
+      const hitPoint = new THREE.Vector3();
+      let grab = "";
+      let start = { x: 0, y: 0 };
+      let moved = 0;
+      const snap = (which: 0 | 1, raw: number) => { const range = ranges[which]; return Math.min(range.max, Math.max(range.min, Math.round(raw / range.step) * range.step)); };
+      const aim = (event: PointerEvent) => {
+        const rect = renderer.domElement.getBoundingClientRect();
+        pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
+        camera.updateMatrixWorld(); scene.updateMatrixWorld(true);
+        raycaster.setFromCamera(pointer, camera);
+      };
+      // Where the finger is on the experiment's own table plane, in the scene's local units.
+      const tablePoint = () => {
+        planeNormal.set(0, 0, 1).transformDirection(contentRoot.matrixWorld);
+        planeOrigin.setFromMatrixPosition(contentRoot.matrixWorld);
+        plane.setFromNormalAndCoplanarPoint(planeNormal, planeOrigin);
+        return raycaster.ray.intersectPlane(plane, hitPoint) ? contentRoot.worldToLocal(hitPoint.clone()) : null;
+      };
+      const nameOf = (object: THREE.Object3D) => {
+        for (const [name, target] of Object.entries(interact.targets)) for (let node: THREE.Object3D | null = object; node; node = node.parent) if (node === target) return name;
+        return "";
+      };
+      const onDown = (event: PointerEvent) => {
+        if (viewMode === "ar" && !presentationRoot.visible) return;
+        aim(event);
+        const hit = raycaster.intersectObjects(Object.values(interact.targets), true)[0];
+        const name = hit ? nameOf(hit.object) : "";
+        if (!name) return;
+        grab = name; start = { x: event.clientX, y: event.clientY }; moved = 0;
+        mount.setPointerCapture(event.pointerId);
+        onMove(event);
+      };
+      const onMove = (event: PointerEvent) => {
+        if (!grab) return;
+        moved = Math.max(moved, Math.hypot(event.clientX - start.x, event.clientY - start.y));
+        aim(event);
+        const point = tablePoint();
+        if (!point) return;
+        if (grab === "arrow" && interact.arrowValue) {
+          interact.drag.target = "arrow";
+          const value = snap(0, interact.arrowValue(point.x));
+          if (value !== valuesRef.current.controlA) controlChangeRef.current?.("a", value);
+        } else if (grab === "cart" && interact.cartMode === "push" && moved >= 8) {
+          const x = Math.min(interact.trackEnd, Math.max(interact.trackStart, point.x));
+          interact.drag.target = "cart"; interact.drag.x = x;
+          interact.drag.value = snap(1, (x - interact.trackStart) / (interact.trackEnd - interact.trackStart) * ranges[1].max);
+        }
+      };
+      const onUp = (event: PointerEvent) => {
+        if (!grab) return;
+        if (grab === "cart" && interact.cartMode === "push" && moved >= 8) { controlChangeRef.current?.("b", interact.drag.value); elapsed = 0; }
+        else if (grab === "cart" && interact.cartMode === "tap" && moved < 8) { const range = ranges[1]; const next = valuesRef.current.controlB + range.step; controlChangeRef.current?.("b", next > range.max ? range.min : next); }
+        else if (grab === "arrow") elapsed = 0;
+        onCancel(event);
+      };
+      const onCancel = (event: PointerEvent) => {
+        interact.drag.target = ""; grab = "";
+        if (mount.hasPointerCapture(event.pointerId)) mount.releasePointerCapture(event.pointerId);
+      };
+      mount.addEventListener("pointerdown", onDown);
+      mount.addEventListener("pointermove", onMove);
+      mount.addEventListener("pointerup", onUp);
+      mount.addEventListener("pointercancel", onCancel);
+      inputCleanup.push(() => {
+        mount.removeEventListener("pointerdown", onDown); mount.removeEventListener("pointermove", onMove);
+        mount.removeEventListener("pointerup", onUp); mount.removeEventListener("pointercancel", onCancel);
+      });
+    }
+
     // Hand-tracking spike: enabled with ?hands=1, AR mode only.
     const handsEnabled = viewMode === "ar" && new URLSearchParams(window.location.search).has("hands");
     const fpsEnabled = viewMode === "ar" && new URLSearchParams(window.location.search).has("fps");
@@ -182,7 +267,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
         renderFps = Math.round(frames * 1000 / (now - statsAt));
         detectFps = Math.round(detects * 1000 / (now - statsAt));
         frames = 0; detects = 0; statsAt = now;
-        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState} | q${quality} d${detectEvery}${emptyScene ? " empty" : ""} | b8`;
+        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState} | q${quality} d${detectEvery}${emptyScene ? " empty" : ""} | b9`;
       }
     };
 
@@ -400,6 +485,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
       window.removeEventListener("resize", resize);
       resizeObserver.disconnect();
       onMarkerChange?.(false);
+      inputCleanup.forEach(remove => remove());
       handTracker?.close();
       handHud?.remove();
       stopCamera();

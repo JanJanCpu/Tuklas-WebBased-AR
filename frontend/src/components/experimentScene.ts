@@ -2,6 +2,19 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { circuitState, complement, earthLayers, mutationState, originalDna, template, type LabState } from "../lib/experiments";
 
+/** What a student can grab in a scene. The scene input handler in ScienceScene drives this. */
+export interface Interaction {
+  targets: Record<string, THREE.Object3D>;
+  /** Written by the input handler while a grab is in progress. */
+  drag: { target: string; x: number; value: number };
+  /** Force arrow tip position (local x) to control A value. */
+  arrowValue?: (localX: number) => number;
+  /** "push": drag the cart forward to set initial velocity (B). "tap": tapping the cart cycles mass (B). */
+  cartMode?: "push" | "tap";
+  trackStart: number;
+  trackEnd: number;
+}
+
 interface Finish { roughness?: number; metalness?: number; emissive?: number; emissiveIntensity?: number; opacity?: number }
 
 /** All experiment content fits the same six-unit presentation area in AR and 3D. */
@@ -9,6 +22,7 @@ export function createExperimentScene(root: THREE.Group, id: string) {
   const updates: ((time: number, a: number, b: number, lab: LabState) => void)[] = [];
   // Every lit mesh, so the whole scene can switch to cheaper shading on weak phones.
   const registry: THREE.Mesh[] = [];
+  let interact: Interaction | undefined;
   const mesh = (geometry: THREE.BufferGeometry, color: number, x = 0, y = 0, z = 0, parent: THREE.Object3D = root, finish: Finish = {}) => {
     const material = new THREE.MeshStandardMaterial({ color, roughness: finish.roughness ?? 0.5, metalness: finish.metalness ?? 0.05, side: THREE.DoubleSide });
     if (finish.emissive !== undefined) { material.emissive.setHex(finish.emissive); material.emissiveIntensity = finish.emissiveIntensity ?? 1; }
@@ -109,16 +123,24 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     const streaks = instanced(new THREE.BoxGeometry(0.6, 0.018, 0.018), 0xffffff, 6, cart, { opacity: 0.4 });
     label(id === "launcher" ? "Air backward / cart forward" : "Frictionless track; wraps at edge", 0, -0.85, 4.5);
     const forceLabel = label("", 0, 2.25, 3.6);
+    // Generous invisible grab area around the force arrow so a fingertip can hit it.
+    const arrowGrab = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.7, 0.7), new THREE.MeshBasicMaterial()); arrowGrab.visible = false; arrowGrab.position.set(1.3, 0, 0); forward.group.add(arrowGrab);
+    const cartMode = id === "inertia" ? "push" : id === "force-mass" ? "tap" : undefined;
+    label(id === "inertia" ? "Drag cart = push · drag arrow = force" : id === "force-mass" ? "Drag arrow = force · tap cart = mass" : "Drag the arrow to set thrust", 0, -1.45, 4.6, root, 11);
+    const drag = { target: "", x: 0, value: 0 };
+    interact = { targets: cartMode ? { cart, arrow: arrowGrab } : { arrow: arrowGrab }, drag, cartMode, trackStart: -2, trackEnd: 2, arrowValue: localX => (localX - forward.group.position.x - 0.13 - 0.4) / 0.25 };
     updates.push((time, a, b) => {
       const acceleration = a / (id === "inertia" ? 1 : b);
       const initialVelocity = id === "inertia" ? b : 0;
       const distance = initialVelocity * time + 0.5 * acceleration * time * time;
       const velocity = initialVelocity + acceleration * time;
-      cart.position.x = -2 + distance % 4;
+      cart.position.x = drag.target === "cart" ? drag.x : -2 + distance % 4;
       cart.rotation.z = Math.min(0.07, acceleration * 0.012);
       wheels.forEach(wheel => { wheel.rotation.z = -distance / 0.13; });
       blocks.forEach((block, i) => { block.visible = id === "force-mass" && i < b; });
-      forward.group.visible = a > 0; backward.group.visible = id === "launcher" && a > 0;
+      // At zero force the arrow shows as a faint ghost, so there is something to grab and drag.
+      forward.group.visible = true; backward.group.visible = id === "launcher" && a > 0;
+      forward.group.children.slice(0, 2).forEach(part => { const material = (part as THREE.Mesh).material as THREE.MeshStandardMaterial; material.transparent = a === 0; material.opacity = a === 0 ? 0.3 : 1; material.depthWrite = a !== 0; });
       forward.set(0.4 + a * 0.25); backward.set(0.4 + a * 0.25);
       streaks.material.opacity = Math.min(0.5, velocity * 0.16);
       for (let i = 0; i < 6; i++) { if (velocity <= 0.25) streaks.hide(i); else streaks.place(i, -0.55 - ((time * 2.4 + i / 6) % 1) * 0.7, 0.12 - (i % 3) * 0.13, (i < 3 ? -1 : 1) * 0.36, Math.min(1.6, 0.4 + velocity * 0.25), 1, 1); }
@@ -126,7 +148,7 @@ export function createExperimentScene(root: THREE.Group, id: string) {
         balloon.scale.set(1.5 - 0.6 * ((time * 0.5) % 1) * (a > 0 ? 1 : 0), 1, 1);
         for (let i = 0; i < 10; i++) { if (a <= 0) { air.hide(i); continue; } const age = (time * (0.8 + a * 0.15) + i / 10) % 1; air.place(i, -0.6 - age * 1.3, 0.63 + Math.sin(i * 2.1) * 0.12 * age, 0, (0.6 + age * 1.6) * (1 - 0.6 * age)); }
       }
-      forceLabel.set(id === "launcher" ? `Equal forces: ${a} N each` : `a = ${acceleration.toFixed(2)} m/s²`);
+      forceLabel.set(drag.target === "cart" ? `Push: v₀ = ${drag.value} m/s` : drag.target === "arrow" ? `Force = ${a} N` : id === "launcher" ? `Equal forces: ${a} N each` : `a = ${acceleration.toFixed(2)} m/s²`);
     });
   } else if (["series", "parallel", "home-circuit"].includes(id)) {
     mesh(new RoundedBoxGeometry(5.6, 3.5, 0.1, 3, 0.05), 0x1d3557, 0, 0.32, -0.2, root, { roughness: 0.8 });
@@ -263,5 +285,5 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     item.material = new THREE.MeshLambertMaterial({ color: old.color, emissive: old.emissive, emissiveIntensity: old.emissiveIntensity, transparent: old.transparent, opacity: old.opacity, depthWrite: old.depthWrite, side: old.side });
     old.dispose();
   });
-  return Object.assign(run, { setLite });
+  return Object.assign(run, { setLite, interact });
 }
