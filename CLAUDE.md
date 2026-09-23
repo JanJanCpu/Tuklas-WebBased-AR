@@ -11,14 +11,14 @@ Capstone: "Development of an Offline Augmented Reality Science Laboratory Simula
 ## Project phases and current state
 
 1. **Pre-defense (done):** thesis audit against the code, research instruments, real bug fixes, Chapter 4/5 written from real data only, Appendices A-E. Never fabricate results, scores or logs; every number in the thesis comes from the real pilot data.
-2. **Post-defense (in progress):** the teacher wants the AR more dynamic ("Pokemon GO level", less flat and static, replacing physical lab objects, hand/touch manipulation). All of this lives on the fork branch `feature/dynamic-ar`. Latest build label: **b24**.
+2. **Post-defense (in progress):** the teacher wants the AR more dynamic ("Pokemon GO level", less flat and static, replacing physical lab objects, hand/touch manipulation). All of this lives on the fork branch `feature/dynamic-ar`. Latest build label: **b25**.
 
 Open items:
 - Phone test of Redmi A3 with `?fps=1&q=2` (expect readout `q2 d2 t320`): does 320x240 tracking reach 24+ fps with a steady marker?
 - Is the Earth (2.2) mini-globe legible on a phone? Do the circuit gestures feel right?
 - Decide the fate of the 31 MB `frontend/public/mediapipe/` hand-tracking files (drop them if hand mode is abandoned).
 - Permanent CORS wildcard for `tuklas-web-based-ar-frontend-*-tuklasar.vercel.app` was offered, not applied (would need code, since the allowlist is exact-match).
-- Optional: DNA helix upgrade for replication/mutation; open-source 3D models; a PR back to the friend's repo once devices are re-tested.
+- Optional: open-source 3D models; a PR back to the friend's repo once devices are re-tested.
 - If the upgraded build is reported in the thesis or paper, re-measure Redmi A3 / Poco C65 (see the fps table below).
 
 ## Fork workflow (IMPORTANT)
@@ -123,7 +123,8 @@ Per-module content and gestures:
 - **bonding**: shell rings; draggable electron token and pair token.
 - **seismic**: strikes list with an automatic schedule (period 3.6 s for S, 2.2 s for P), hammer with wind-up/swing (0.3 s)/recoil timeline, station, rock, waves, drag-to-pull hammer; trace at z=-0.02, `COLS=24`, `K=5`, `TRACE=100`.
 - **earth-scale**: cutaway globe (R=1.75), shells, faces, ghost wireframe, chips; tapping opens a magnified surface slab (rock textures, brackets, "Mantle to 2,891 km" with a fading orange mantle block) plus a small clone of the same globe with a red marker, line and "Zoomed in here" label.
-- **replication / mutation**: idle sway (DNA helix upgrade still optional).
+- **replication**: real twisting double helix (instanced rungs/joints/links, letter sprites). "Separate and copy" unzips it from the left; a new strand (orange backbone) builds on each old one (blue), so both daughters visibly keep one old strand (semiconservative). Student choices from the workbench (`lab.basePairs`) colour the new bases (grey `?` = unset, red = wrong). Tap the DNA to toggle separate/joined.
+- **mutation**: two helices sharing one x scale (original above, edited below) with codon bands and a protein bead chain under each (edited beads turn orange where the amino acid changed, red for STOP). Each original base keeps its own piece, so an insertion or deletion slides every later base along and the codons regroup; the removed base lifts out, the changed/added base glows. Tap a base in the original row to pick `Base position` (caret marks it).
 
 ### `ScienceScene.tsx`
 Three.js 0.164.1 + AR.js scene. Studio environment lighting + ACES tone mapping. Generic pointer input: pointer raycast to the scene's table plane, `touch-action: pan-y` plus a touchmove `preventDefault` only while grabbing (so scrolling still works, and dragging is not cancelled by scroll on phones), relative pull from the grab point. Camera framing (`sceneBounds`, `frameScene`) fits measured bounds over sampled times and both extremes of control A. `viewMode "fallback"` (3D mode) uses a LIGHT background (`.ar-frame.fallback-mode`).
@@ -132,7 +133,7 @@ Three.js 0.164.1 + AR.js scene. Studio environment lighting + ACES tone mapping.
 Auto step-down when fps stays under 19, persisted in `localStorage` as `tuklas-quality-v2`:
 - 0 full; 1 marker detection every 2nd frame; 2 pixelRatio 1 + 320x240 tracking canvas (`trackingSize`, `trackingLow` state); 3 Lambert (cheaper) shading.
 
-URL parameters: `?fps=1` (HUD: `render N fps | hands N fps | N ms DELEGATE | state | qN dN tNNN[ empty] | bNN`), `?q=<0-3>` force a level, `?detect=<n>` detect every n frames, `?empty=1` empty scene (isolates tracking cost), `?hands=1|cpu` hand-tracking spike. The HUD build label (currently `b24`, a string in `ScienceScene.tsx`) is how you confirm a phone loaded the new build; bump it on every change you want to verify remotely.
+URL parameters: `?fps=1` (HUD: `render N fps | hands N fps | N ms DELEGATE | state | qN dN tNNN[ empty] | bNN`), `?q=<0-3>` force a level, `?detect=<n>` detect every n frames, `?empty=1` empty scene (isolates tracking cost), `?hands=1|cpu` hand-tracking spike. The HUD build label (currently `b25`, a string in `ScienceScene.tsx`) is how you confirm a phone loaded the new build; bump it on every change you want to verify remotely.
 
 ### Hand tracking (experimental, probably to be dropped)
 `lib/handTracking.ts` wraps MediaPipe Hand Landmarker (lazy import, GPU then CPU fallback, pinch hysteresis). Accurate but **not viable on budget phones**: Poco C65 GPU 5-10 fps render and 160-330 ms per detection; CPU worse (1-3 fps while tracking). Decision: touch manipulation is the main interaction; hand mode only for strong phones. Model files (~31 MB) live in `frontend/public/mediapipe/` and `@mediapipe/tasks-vision` is in `frontend/package.json`; excluded from the precache. Candidate for removal.

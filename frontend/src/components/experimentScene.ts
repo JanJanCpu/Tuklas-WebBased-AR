@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import { circuitState, complement, controls, earthLayers, mutationState, originalDna, template, type LabState } from "../lib/experiments";
+import { circuitState, complement, controls, earthLayers, mutationState, originalDna, template, translate, type LabState } from "../lib/experiments";
 
 /** What a scene lets the student change from inside the model. ScienceScene supplies the pointer position and this API. */
 export interface InteractionApi {
@@ -76,6 +76,55 @@ export function createExperimentScene(root: THREE.Group, id: string) {
   const glow = (color: number, size: number, parent: THREE.Object3D = root) => {
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, color, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, toneMapped: false }));
     sprite.scale.setScalar(size); sprite.material.opacity = 0; parent.add(sprite); return sprite;
+  };
+
+  // DNA base colours, shared by the replication and mutation models.
+  const baseColors: Record<string, number> = { A: 0x3ea870, T: 0xd76164, C: 0x408bd0, G: 0xd8b238, "": 0x9caaba };
+
+  // Instanced meshes with a rotation per piece. The DNA models draw every rung, backbone link, joint and bead in a few batches instead of one draw call each.
+  const oriented = (geometry: THREE.BufferGeometry, count: number, parent: THREE.Object3D = root, finish: Finish = {}) => {
+    const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: finish.roughness ?? 0.35, metalness: finish.metalness ?? 0.1 });
+    const item = new THREE.InstancedMesh(geometry, material, count);
+    item.frustumCulled = false; parent.add(item); registry.push(item);
+    const dummy = new THREE.Object3D(); const up = new THREE.Vector3(0, 1, 0); const along = new THREE.Vector3(); const tint = new THREE.Color();
+    const hide = (index: number) => { dummy.position.set(0, 0, 0); dummy.quaternion.identity(); dummy.scale.setScalar(0); dummy.updateMatrix(); item.setMatrixAt(index, dummy.matrix); };
+    for (let i = 0; i < count; i++) { hide(i); item.setColorAt(i, tint.setHex(0xffffff)); }
+    /** A rod between two points. Build the geometry as a unit cylinder (radius 1, height 1). */
+    const span = (index: number, from: THREE.Vector3, to: THREE.Vector3, thickness: number, color: number) => {
+      along.subVectors(to, from); const length = along.length();
+      if (length < 1e-4 || thickness <= 0) { hide(index); return; }
+      dummy.position.addVectors(from, to).multiplyScalar(0.5); dummy.quaternion.setFromUnitVectors(up, along.divideScalar(length)); dummy.scale.set(thickness, length, thickness); dummy.updateMatrix();
+      item.setMatrixAt(index, dummy.matrix); item.setColorAt(index, tint.setHex(color));
+    };
+    /** A ball. Build the geometry as a unit sphere. */
+    const point = (index: number, at: THREE.Vector3, size: number, color: number) => {
+      dummy.position.copy(at); dummy.quaternion.identity(); dummy.scale.setScalar(size); dummy.updateMatrix();
+      item.setMatrixAt(index, dummy.matrix); item.setColorAt(index, tint.setHex(color));
+    };
+    const dirty = () => { item.instanceMatrix.needsUpdate = true; if (item.instanceColor) item.instanceColor.needsUpdate = true; };
+    return { span, point, hide, dirty };
+  };
+
+  // Letter chips for bases and amino acids: one shared texture per symbol, so a sprite only swaps its map.
+  const letterTextures = new Map<string, THREE.CanvasTexture>();
+  const letterTexture = (text: string) => {
+    let texture = letterTextures.get(text);
+    if (!texture) {
+      const canvas = document.createElement("canvas"); canvas.width = canvas.height = 96;
+      const ctx = canvas.getContext("2d")!;
+      ctx.font = `bold ${text.length > 2 ? 34 : 66}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.lineWidth = 10; ctx.lineJoin = "round"; ctx.strokeStyle = "rgba(18,30,48,0.92)"; ctx.strokeText(text, 48, 52);
+      ctx.fillStyle = "#ffffff"; ctx.fillText(text, 48, 52);
+      texture = new THREE.CanvasTexture(canvas); letterTextures.set(text, texture);
+    }
+    return texture;
+  };
+  const letter = (size: number, parent: THREE.Object3D = root) => {
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: letterTexture("?"), depthWrite: false, toneMapped: false }));
+    sprite.scale.set(size, size, 1); sprite.renderOrder = 8; parent.add(sprite);
+    let previous = "?";
+    const set = (text: string) => { if (text === previous) return; previous = text; sprite.material.map = letterTexture(text); };
+    return { sprite, set };
   };
 
   // Solid arrow (WebGL lines are always one pixel wide, which read as hairlines on a phone).
@@ -734,23 +783,167 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       });
       caption.set(!a && time < feedback.until ? feedback.text : lab.layers === 0 && !a ? "Drag the Inner core onto the globe to start" : lab.layers < 4 && !a ? "Now add the next layer, working outward" : `${earthLayers[b].name}: ${earthLayers[b].depth}`);
     });
-  } else if (id === "replication" || id === "mutation") {
-    const colors: Record<string, number> = { A: 0x3ea870, T: 0xd76164, C: 0x408bd0, G: 0xd8b238, "": 0x9caaba };
-    const count = id === "replication" ? 24 : 25;
-    const bases = Array.from({ length: count }, () => sphere(0x9caaba, 0, 0, 0.14, root, { roughness: 0.3, metalness: 0.1 }));
-    const labels = bases.map(() => label("?", 0, 0, 0.28, root, 1));
-    const bonds = id === "replication" ? Array.from({ length: 12 }, () => line([[0, 0], [0, 0]], 0x617e93)) : [];
-    const captions = [label("", 0, 1.9, 5), label("", 0, -1.8, 5)];
+  } else if (id === "replication") {
+    // Two strands twist round each other. "Separate and copy" unzips them from the left, and a new strand (orange) builds on each old one (blue).
+    const SLOTS = 6, SUB = 5, X0 = -1.75, STEP = 0.7, R = 0.4, TWIST = 1.05, SPLIT = 0.85, OLD = 0x2f5d8a, NEW = 0xf08a3c;
+    // Strands: 0 = the original template, 1 = its partner, 2 and 3 = the new strands that pair with them.
+    const rungs = oriented(new THREE.CylinderGeometry(1, 1, 1, 10), 4 * SLOTS);
+    const joints = oriented(new THREE.SphereGeometry(1, 14, 10), 4 * SLOTS, root, { roughness: 0.3 });
+    const links = oriented(new THREE.CylinderGeometry(1, 1, 1, 8), 4 * SLOTS * SUB);
+    const letters = Array.from({ length: 4 * SLOTS }, () => letter(0.3));
+    const captions = [label("", 0, 1.9, 4.6, root, 12), label("", 0, -1.9, 4.6, root, 12)];
+    const joint = Array.from({ length: 4 * SLOTS }, () => new THREE.Vector3());
+    const shown = Array<number>(4 * SLOTS).fill(0.45);
+    const cyAt = Array<number>(4 * SLOTS).fill(0), seenAt = Array<number>(4 * SLOTS).fill(0);
+    const axis = new THREE.Vector3(), out = new THREE.Vector3(), from = new THREE.Vector3(), to = new THREE.Vector3();
+    const hit = new THREE.Group(); root.add(hit);
+    const hitBox = new THREE.Mesh(new THREE.BoxGeometry(4.6, 3, 1.6), new THREE.MeshBasicMaterial()); hitBox.visible = false; hit.add(hitBox);
+    interact = { targets: { dna: hit }, up: (_name, _point, moved, api) => { if (moved < 8) api.setControl("a", api.values().a ? 0 : 1); } };
+    let k = 0, last = 0;
     updates.push((time, a, b, lab) => {
-      if (id === "replication") {
-        root.rotation.y = b * Math.PI / 12;
-        captions[0].set(a ? "Daughter 1: old + new" : "Original DNA: paired templates"); captions[1].set(a ? "Daughter 2: old + new" : "Separate the strands to copy");
-        bases.forEach((base, i) => { const row = Math.floor(i / 6); const col = i % 6; const old = row === 0 || row === 2; const value = row === 0 ? template[col] : row === 2 ? complement(template[col]) : lab.basePairs[(row === 1 ? 0 : 6) + col]; const correct = old || value === (row === 1 ? complement(template[col]) : template[col]); base.visible = labels[i].sprite.visible = Boolean(a) || old; base.position.set(-1.75 + col * 0.7, (a ? 1.1 - row * 0.7 : row === 0 ? 0.4 : -0.4) + Math.sin(time * 2 + col) * 0.03, 0); base.material.color.setHex(!value ? colors[""] : correct ? colors[value] : 0xe64b38); labels[i].set(value || "?"); labels[i].sprite.position.set(base.position.x, base.position.y, 0.22); });
-        bonds.forEach((bond, i) => { const col = i % 6; const first = i < 6 ? col : col + 12; const second = a ? first + 6 : col + 12; const value = lab.basePairs[i]; bond.visible = a ? value === (i < 6 ? complement(template[col]) : template[col]) : i < 6; bond.geometry.setFromPoints([bases[first].position, bases[second].position]); });
-      } else {
-        const mutation = mutationState(a, b); captions[0].set("Original coding DNA (5′ → 3′)"); captions[1].set("Edited coding DNA · groups of 3 = codons");
-        bases.forEach((base, i) => { const original = i < 12; const col = original ? i : i - 12; const value = original ? originalDna[col] : mutation.dna[col]; base.visible = labels[i].sprite.visible = Boolean(value); base.position.set(-2.5 + col * 0.4 + Math.floor(col / 3) * 0.08, (original ? 0.7 : -0.7) + Math.sin(time * 2 + col) * 0.03, 0); base.scale.setScalar(col === b - 1 && !original && a ? 1.3 : 1); base.material.color.setHex(colors[value] || 0x9caaba); labels[i].set(value || ""); labels[i].sprite.position.set(base.position.x, base.position.y, 0.22); });
+      const dt = Math.max(0, Math.min(0.1, time - last)); last = time;
+      k += (a - k) * Math.min(1, dt * 3); if (Math.abs(a - k) < 0.003) k = a;
+      root.rotation.y = b * Math.PI / 12;
+      const spin = time * 0.45;
+      for (let s = 0; s < 4; s++) for (let i = 0; i < SLOTS; i++) {
+        const n = s * SLOTS + i, fresh = s > 1;
+        // The fork opens from the left: each column lets go a little after the one before it.
+        const open = Math.max(0, Math.min(1, k * 1.8 - i * 0.16));
+        const seen = fresh ? open : 1;
+        const cy = s === 0 ? open * SPLIT : s === 1 ? -open * SPLIT : (s === 2 ? 1 : -1) * (SPLIT + (1 - open) * 0.4);
+        const phase = (s === 0 || s === 3 ? 0 : Math.PI) + i * TWIST + spin;
+        axis.set(X0 + i * STEP, cy, 0); out.set(0, Math.sin(phase), Math.cos(phase)); joint[n].copy(axis).addScaledVector(out, R);
+        const value = s === 0 ? template[i] : s === 1 ? complement(template[i]) : lab.basePairs[(s - 2) * 6 + i];
+        const ok = !fresh || value === (s === 2 ? complement(template[i]) : template[i]);
+        shown[n] += ((value ? 1 : 0.45) - shown[n]) * Math.min(1, dt * 8);
+        cyAt[n] = cy; seenAt[n] = seen;
+        if (seen < 0.2) { rungs.hide(n); joints.hide(n); letters[n].sprite.visible = false; continue; }
+        from.copy(axis).addScaledVector(out, 0.04); to.copy(axis).addScaledVector(out, 0.04 + (R - 0.04) * shown[n] * seen);
+        rungs.span(n, from, to, (value ? 0.06 : 0.035) * seen, !value ? baseColors[""] : ok ? baseColors[value] : 0xe64b38);
+        joints.point(n, joint[n], 0.085 * seen, fresh ? NEW : OLD);
+        letters[n].set(value || "?"); letters[n].sprite.visible = seen > 0.6; letters[n].sprite.position.copy(joint[n]).addScaledVector(out, 0.22);
       }
+      // The backbone follows the helix between columns, so each strand curves instead of zig-zagging.
+      const along = (s: number, pos: number, into: THREE.Vector3) => {
+        const i0 = Math.min(SLOTS - 2, Math.floor(pos)), u = pos - i0, n0 = s * SLOTS + i0;
+        const phase = (s === 0 || s === 3 ? 0 : Math.PI) + pos * TWIST + spin;
+        return into.set(X0 + pos * STEP, cyAt[n0] * (1 - u) + cyAt[n0 + 1] * u + R * Math.sin(phase), R * Math.cos(phase));
+      };
+      for (let s = 0; s < 4; s++) for (let i = 1; i < SLOTS; i++) for (let f = 0; f < SUB; f++) {
+        const n = (s * SLOTS + i) * SUB + f;
+        if (seenAt[s * SLOTS + i] < 0.2) { links.hide(n); continue; }
+        links.span(n, along(s, i - 1 + f / SUB, from), along(s, i - 1 + (f + 1) / SUB, to), 0.04 * seenAt[s * SLOTS + i], s > 1 ? NEW : OLD);
+      }
+      rungs.dirty(); joints.dirty(); links.dirty();
+      captions[0].set(a ? "Daughter 1: old strand (blue) + new strand (orange)" : "Original DNA: two paired strands");
+      captions[1].set(a ? "Daughter 2: old strand (blue) + new strand (orange)" : "Tap the DNA to separate it and copy");
+    });
+  } else if (id === "mutation") {
+    // Both rows share one x scale, so an insertion or deletion visibly pushes every later base along and regroups the codons under it.
+    const SLOTS = 13, SUB = 2, HUB = 4 * SLOTS * SUB, X0 = -2.5, STEP = 0.4, GAP = 0.09, R = 0.23, PITCH = 0.62 / STEP, PLAIN = 0x6c86a6, HOT = 0xff5c4d, SAME = 0x2fb6a8, CHANGED = 0xf08a3c;
+    const ROW = [1.35, -0.5], BEAD = [0.7, -1.12];
+    const slotX = (slot: number) => X0 + slot * STEP + Math.floor(slot / 3) * GAP;
+    const rungs = oriented(new THREE.CylinderGeometry(1, 1, 1, 10), 4 * SLOTS);
+    const joints = oriented(new THREE.SphereGeometry(1, 14, 10), 4 * SLOTS);
+    const links = oriented(new THREE.CylinderGeometry(1, 1, 1, 8), HUB + 16);
+    const beads = oriented(new THREE.SphereGeometry(1, 16, 12), 8, root, { roughness: 0.3 });
+    const letters = Array.from({ length: 2 * SLOTS }, () => letter(0.22));
+    const beadLetters = Array.from({ length: 8 }, () => letter(0.3));
+    const bars = [0, 1].flatMap(row => [0, 1, 2, 3].map(g => ({ row, g, mesh: mesh(new RoundedBoxGeometry(1, 0.66, 0.1, 2, 0.04), g % 2 ? 0xc8b6e6 : 0x9cc3e6, 0, ROW[row], -0.42, root, { opacity: 0.32 }), x: NaN, w: 1 })));
+    const xs = [Array<number>(SLOTS).fill(0), Array<number>(SLOTS).fill(0)];
+    const amt = [Array<number>(SLOTS).fill(0), Array<number>(SLOTS).fill(0)];
+    const kept = [Array<string>(SLOTS).fill(""), Array<string>(SLOTS).fill("")];
+    const at = [Array<number>(SLOTS).fill(-1), Array<number>(SLOTS).fill(-1)];
+    const beadAmt = Array<number>(8).fill(0);
+    const beadSymbol = Array<string>(8).fill("");
+    const jp = Array.from({ length: 4 }, () => Array.from({ length: SLOTS }, () => new THREE.Vector3()));
+    const axis = new THREE.Vector3(), out = new THREE.Vector3(), from = new THREE.Vector3(), to = new THREE.Vector3();
+    const ghost = sphere(0xd84a4a, 0, 0, 0.12, root, { opacity: 0.6, emissive: 0xd84a4a, emissiveIntensity: 0.6 });
+    const ghostChip = letter(0.22);
+    const spot = glow(0xffd657, 1);
+    const caret = mesh(new THREE.ConeGeometry(0.1, 0.22, 14), 0xffb020, 0, 1.8, 0.1, root, { emissive: 0xffb020, emissiveIntensity: 0.5 }); caret.rotation.z = Math.PI;
+    const captions = [label("Original coding DNA (5\u2032 \u2192 3\u2032) · tap a base to pick it", 0, 2.18, 4.8, root, 12), label("Edited coding DNA · groups of 3 = codons", 0, 0.24, 4.4, root, 12), label("", 0, -1.75, 4.4, root, 12)];
+    const hits = Array.from({ length: 12 }, (_, j) => {
+      const group = new THREE.Group(); group.position.set(slotX(j), ROW[0], 0); root.add(group);
+      const box = new THREE.Mesh(new THREE.BoxGeometry(STEP, 0.9, 0.9), new THREE.MeshBasicMaterial()); box.visible = false; group.add(box); return group;
+    });
+    interact = { targets: Object.fromEntries(hits.map((group, j) => [`base${j}`, group])), up: (name, _point, moved, api) => { if (moved < 8) api.setControl("b", Number(name.slice(4)) + 1); } };
+    let caretX = NaN, last = 0;
+    updates.push((time, a, b) => {
+      const dt = Math.max(0, Math.min(0.1, time - last)); last = time;
+      const ease = Math.min(1, dt * 7), spin = time * 0.35;
+      const mutation = mutationState(a, b), i = b - 1, dna = mutation.dna;
+      at[0].fill(-1); at[1].fill(-1);
+      // Row 0 is the original strand. Row 1 is the edited one: every original base keeps its own piece, so it can slide to its new place.
+      for (let row = 0; row < 2; row++) for (let e = 0; e < SLOTS; e++) {
+        let slot = -1, char = "", hot = false;
+        if (row === 0) { if (e < 12) { slot = e; char = originalDna[e]; } }
+        else if (e < 12) { slot = a === 2 && e >= i ? e + 1 : a === 3 ? (e === i ? -1 : e > i ? e - 1 : e) : e; char = a === 1 && e === i ? dna[i] : originalDna[e]; hot = a === 1 && e === i; }
+        else if (a === 2) { slot = i; char = dna[i]; hot = true; }
+        if (char) kept[row][e] = char; else char = kept[row][e];
+        if (slot >= 0) at[row][slot] = e;
+        const tx = slot >= 0 ? slotX(slot) : xs[row][e];
+        if (slot >= 0 && amt[row][e] < 0.02) xs[row][e] = tx;
+        xs[row][e] += (tx - xs[row][e]) * ease;
+        amt[row][e] += ((slot >= 0 ? 1 : 0) - amt[row][e]) * ease;
+        const seen = amt[row][e];
+        for (let st = 0; st < 2; st++) {
+          const n = (row * 2 + st) * SLOTS + e;
+          if (seen < 0.02 || !char) { rungs.hide(n); joints.hide(n); if (!st) letters[row * SLOTS + e].sprite.visible = false; continue; }
+          const phase = (xs[row][e] - X0) * PITCH + (st ? Math.PI : 0) + spin;
+          axis.set(xs[row][e], ROW[row], 0); out.set(0, Math.sin(phase), Math.cos(phase));
+          from.copy(axis).addScaledVector(out, 0.03); to.copy(axis).addScaledVector(out, 0.03 + (R - 0.03) * seen);
+          rungs.span(n, from, to, (hot ? 0.075 : 0.05) * seen, baseColors[st ? complement(char) : char] ?? baseColors[""]);
+          jp[row * 2 + st][e].copy(axis).addScaledVector(out, R);
+          joints.point(n, jp[row * 2 + st][e], (hot ? 0.12 : 0.075) * seen, hot ? HOT : PLAIN);
+          if (!st) { const chip = letters[row * SLOTS + e]; chip.set(char); chip.sprite.visible = seen > 0.6; chip.sprite.position.copy(jp[row * 2][e]).addScaledVector(out, 0.17); }
+        }
+      }
+      for (let row = 0; row < 2; row++) for (let st = 0; st < 2; st++) for (let s = 1; s < SLOTS; s++) {
+        const n = (row * 2 + st) * SLOTS + s, e1 = at[row][s - 1], e2 = at[row][s];
+        const ok = e1 >= 0 && e2 >= 0 && amt[row][e1] > 0.3 && amt[row][e2] > 0.3;
+        for (let f = 0; f < SUB; f++) {
+          if (!ok) { links.hide(n * SUB + f); continue; }
+          const spot1 = xs[row][e1] + (xs[row][e2] - xs[row][e1]) * (f / SUB), spot2 = xs[row][e1] + (xs[row][e2] - xs[row][e1]) * ((f + 1) / SUB);
+          const p1 = (spot1 - X0) * PITCH + (st ? Math.PI : 0) + spin, p2 = (spot2 - X0) * PITCH + (st ? Math.PI : 0) + spin;
+          from.set(spot1, ROW[row] + R * Math.sin(p1), R * Math.cos(p1)); to.set(spot2, ROW[row] + R * Math.sin(p2), R * Math.cos(p2));
+          links.span(n * SUB + f, from, to, 0.035, PLAIN);
+        }
+      }
+      // A removed base lifts out of the strand; the changed or added base glows.
+      ghost.visible = ghostChip.sprite.visible = a === 3;
+      if (a === 3) { ghost.position.set(xs[1][i], ROW[1] + 0.38 + Math.sin(time * 3) * 0.03, 0.1); ghostChip.set(originalDna[i]); ghostChip.sprite.position.set(ghost.position.x, ghost.position.y, 0.3); }
+      const hotX = a === 2 ? xs[1][12] : xs[1][i];
+      spot.material.opacity = a ? 0.5 + 0.25 * Math.sin(time * 4) : 0;
+      if (a) spot.position.set(hotX, a === 3 ? ROW[1] + 0.38 : ROW[1], 0.3);
+      // Codon bands and the protein each row spells out.
+      const proteins = [translate(originalDna).split("\u2013"), translate(dna).split("\u2013")];
+      bars.forEach(bar => {
+        const codons = Math.floor((bar.row ? dna.length : originalDna.length) / 3);
+        const tx = (slotX(bar.g * 3) + slotX(bar.g * 3 + 2)) / 2, tw = slotX(bar.g * 3 + 2) - slotX(bar.g * 3) + 0.34;
+        if (Number.isNaN(bar.x) || !bar.mesh.visible) { bar.x = tx; bar.w = tw; }
+        bar.x += (tx - bar.x) * ease; bar.w += (tw - bar.w) * ease;
+        bar.mesh.visible = bar.g < codons; bar.mesh.position.x = bar.x; bar.mesh.scale.x = bar.w;
+      });
+      for (let row = 0; row < 2; row++) for (let g = 0; g < 4; g++) {
+        const n = row * 4 + g, bar = bars[n];
+        // Keep the last symbol so a bead can fade out after its codon is gone.
+        if (proteins[row][g]) beadSymbol[n] = proteins[row][g];
+        const symbol = beadSymbol[n], stop = symbol === "STOP";
+        beadAmt[n] += ((proteins[row][g] && bar.mesh.visible ? 1 : 0) - beadAmt[n]) * ease;
+        if (beadAmt[n] < 0.02 || !symbol) { beads.hide(n); beadLetters[n].sprite.visible = false; links.hide(HUB + n); continue; }
+        from.set(bar.x, BEAD[row], 0); beads.point(n, from, 0.16 * beadAmt[n], stop ? 0xd84a4a : row === 0 || symbol === proteins[0][g] ? SAME : CHANGED);
+        beadLetters[n].set(symbol); beadLetters[n].sprite.visible = beadAmt[n] > 0.6; beadLetters[n].sprite.position.set(bar.x, BEAD[row], 0.2);
+        from.set(bar.x, ROW[row] - 0.34, 0); to.set(bar.x, BEAD[row] + 0.17, 0); links.span(HUB + n, from, to, 0.02, 0x9aa9ba);
+      }
+      for (let row = 0; row < 2; row++) for (let g = 0; g < 3; g++) {
+        const n = row * 4 + g, chain = HUB + 8 + row * 3 + g;
+        if (beadAmt[n] > 0.3 && beadAmt[n + 1] > 0.3) { from.set(bars[n].x, BEAD[row], 0); to.set(bars[n + 1].x, BEAD[row], 0); links.span(chain, from, to, 0.04, 0x8fa3b8); } else links.hide(chain);
+      }
+      const cx = slotX(i); caretX = Number.isNaN(caretX) ? cx : caretX + (cx - caretX) * ease;
+      caret.position.set(caretX, ROW[0] + 0.45 + Math.sin(time * 4) * 0.03, 0.1);
+      captions[2].set(mutation.effect === "Original sequence" ? "Pick a mutation to see how the protein changes" : mutation.effect);
+      rungs.dirty(); joints.dirty(); links.dirty(); beads.dirty();
     });
   } else throw new Error(`Unknown experiment: ${id}`);
   const run = (time: number, a: number, b: number, lab: LabState) => updates.forEach(update => update(time, a, b, lab));
