@@ -11,7 +11,7 @@ Capstone: "Development of an Offline Augmented Reality Science Laboratory Simula
 ## Project phases and current state
 
 1. **Pre-defense (done):** thesis audit against the code, research instruments, real bug fixes, Chapter 4/5 written from real data only, Appendices A-E. Never fabricate results, scores or logs; every number in the thesis comes from the real pilot data.
-2. **Post-defense (in progress):** the teacher wants the AR more dynamic ("Pokemon GO level", less flat and static, replacing physical lab objects, hand/touch manipulation). All of this lives on the fork branch `feature/dynamic-ar`. Latest build label: **b26**.
+2. **Post-defense (in progress):** the teacher wants the AR more dynamic ("Pokemon GO level", less flat and static, replacing physical lab objects, hand/touch manipulation). All of this lives on the fork branch `feature/dynamic-ar`. Latest build label: **b27**.
 
 Open items:
 - Phone test of Redmi A3 with `?fps=1&q=2` (expect readout `q2 d2 t320`): does 320x240 tracking reach 24+ fps with a steady marker?
@@ -117,7 +117,7 @@ Thin Express app (`app.ts`) mounting per-resource routers (`routes/*.ts`); `lib/
 All 3D scene content. `createExperimentScene(root, id)` returns `run(time, a, b, lab)` plus `{ setLite, interact }`. `a`/`b` are the two slider controls (ranges come from `controls` in `lib/experiments.ts`); `lab` is `LabState { closed, branchMask, electrons, basePairs, layers }`. Helpers: `mesh(...)` (registers in `registry` so `setLite` can swap materials), `sphere`, `instanced(...)` (instanced meshes to cut draw calls; returns `place/hide/tint`), `line`, `label`, `glow`, `arrow`, `wire(points, parent, gaps)` (cylinder wire with gap cutouts). Interfaces `Interaction` (`targets`, `down`, `move`, `up`, `cancel`) and `InteractionApi` (`values()`, `setControl`, `setLab`).
 
 Per-module content and gestures:
-- **cart** (inertia, force-mass, launcher): wagon, arrows, blocks, balloon/air puffs, speed streaks (no white rim on the wagon, streaks are fine). Drag the arrow = force (`a`), drag the cart = mass (`b`, inertia), tap the cart = mass (force-mass).
+- **cart** (inertia, force-mass, launcher): wagon, arrows, blocks, balloon/air puffs, speed streaks (no white rim on the wagon, streaks are fine). Drag the arrow = force (`a`), drag the cart = mass (`b`, inertia), tap the cart = mass (force-mass). **Launcher (1.3):** the balloon is a lathe-turned teardrop with a nozzle at the back of the tray; it empties once over `BURN` = 4 s (fast at first, then slow), flutters at the nozzle, then sags. Thrust only acts while there is air, so after that the cart coasts at the speed it reached (the reaction arrow disappears and the label says so). Tap the balloon (or drag the arrow) to refill and relaunch via `api.restart()`.
 - **circuits** (series, parallel, home-circuit): board 5.6x3.7, round white E27-style lamp holders with upright screw-in bulbs (`bodies[]` groups, `ROW=0.15`, `LIFT=0.64`, `PARALLEL_SCALE=0.68`), battery holder with 3 cells at x -0.6/0/0.6, hinged switch lever (SW0=1.35, SW1=1.85, y -1.15). Gestures: drag/tap the lever, drag a cell or bulb out to remove it, tap or drag its ghost to add it back. Wire gaps exist for the battery holder and switch.
 - **chemical-change**: bench, beaker, draggable bottle/jar, instanced foam and bubbles.
 - **bonding**: shell rings; draggable electron token and pair token.
@@ -133,7 +133,7 @@ Three.js 0.164.1 + AR.js scene. Studio environment lighting + ACES tone mapping.
 Auto step-down when fps stays under 19, persisted in `localStorage` as `tuklas-quality-v2`:
 - 0 full; 1 marker detection every 2nd frame; 2 pixelRatio 1 + 320x240 tracking canvas (`trackingSize`, `trackingLow` state); 3 Lambert (cheaper) shading.
 
-URL parameters: `?fps=1` (HUD: `render N fps | hands N fps | N ms DELEGATE | state | qN dN tNNN[ empty] | bNN`), `?q=<0-3>` force a level, `?detect=<n>` detect every n frames, `?empty=1` empty scene (isolates tracking cost), `?hands=1|cpu` hand-tracking spike. The HUD build label (currently `b26`, a string in `ScienceScene.tsx`) is how you confirm a phone loaded the new build; bump it on every change you want to verify remotely.
+URL parameters: `?fps=1` (HUD: `render N fps | hands N fps | N ms DELEGATE | state | qN dN tNNN[ empty] | bNN`), `?q=<0-3>` force a level, `?detect=<n>` detect every n frames, `?empty=1` empty scene (isolates tracking cost), `?hands=1|cpu` hand-tracking spike. The HUD build label (currently `b27`, a string in `ScienceScene.tsx`) is how you confirm a phone loaded the new build; bump it on every change you want to verify remotely.
 
 ### Hand tracking (experimental, probably to be dropped)
 `lib/handTracking.ts` wraps MediaPipe Hand Landmarker (lazy import, GPU then CPU fallback, pinch hysteresis). Accurate but **not viable on budget phones**: Poco C65 GPU 5-10 fps render and 160-330 ms per detection; CPU worse (1-3 fps while tracking). Decision: touch manipulation is the main interaction; hand mode only for strong phones. Model files (~31 MB) live in `frontend/public/mediapipe/` and `@mediapipe/tasks-vision` is in `frontend/package.json`; excluded from the precache. Candidate for removal.

@@ -200,7 +200,17 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     const blocks = [0, 1, 2, 3].map(i => mesh(new RoundedBoxGeometry(0.42, 0.11, 0.35, 2, 0.02), 0x6b86a6, 0, 0.06 + i * 0.12, 0, cart, { metalness: 0.75, roughness: 0.3 }));
     const forward = arrow(0x16853f); forward.group.position.set(-0.4, 1.25, 0);
     const backward = arrow(0x2988d5); backward.group.position.set(0.4, 1.85, 0); backward.group.rotation.z = Math.PI; backward.group.visible = id === "launcher";
-    const balloon = sphere(0x45b9c5, 0, 0.5, 0.35, cart, { roughness: 0.2, metalness: 0.1 }); balloon.scale.x = 1.5; balloon.visible = id === "launcher";
+    // A teardrop balloon lying on the tray, its nozzle out over the back. The group's origin is the nozzle tip, so as it empties the body shrinks back toward the nozzle.
+    const balloon = new THREE.Group(); cart.add(balloon); balloon.visible = id === "launcher";
+    const shell = new THREE.Group(); shell.rotation.z = -Math.PI / 2; balloon.add(shell);
+    const profile = [[0.05, 0], [0.052, 0.09], [0.085, 0.16], [0.19, 0.24], [0.29, 0.34], [0.34, 0.48], [0.33, 0.62], [0.27, 0.75], [0.16, 0.84], [0.05, 0.895], [0, 0.91]].map(([r, y]) => new THREE.Vector2(r, y));
+    mesh(new THREE.LatheGeometry(profile, 32), 0xffc233, 0, 0, 0, shell, { roughness: 0.12, metalness: 0.05 });
+    const lip = mesh(new THREE.TorusGeometry(0.056, 0.02, 8, 18), 0xd9861a, 0, 0.01, 0, shell, { roughness: 0.4 }); lip.rotation.x = Math.PI / 2;
+    const shine = sphere(0xffffff, -0.2, 0.55, 0.06, shell, { opacity: 0.4, roughness: 0.1 }); shine.position.z = 0.2; shine.scale.set(0.5, 2.2, 0.8);
+    // A steady grab area for the tap, since the balloon itself shrinks.
+    const balloonHit = new THREE.Group(); balloonHit.position.set(0.05, 0.3, 0); balloonHit.visible = id === "launcher"; cart.add(balloonHit);
+    const balloonBox = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.8, 0.7), new THREE.MeshBasicMaterial()); balloonBox.visible = false; balloonHit.add(balloonBox);
+    const BURN = 4;                      // seconds of thrust before the balloon is empty
     const air = instanced(new THREE.SphereGeometry(0.05, 8, 6), 0xffffff, 10, cart, { opacity: 0.5, roughness: 0.2 });
     const streaks = instanced(new THREE.BoxGeometry(0.6, 0.018, 0.018), 0xffffff, 6, cart, { opacity: 0.4 });
     label(id === "launcher" ? "Air backward / cart forward" : "Frictionless track; wraps at edge", 0, -0.85, 4.5);
@@ -208,13 +218,13 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     // Generous invisible grab area around the force arrow so a fingertip can hit it.
     const arrowGrab = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.7, 0.7), new THREE.MeshBasicMaterial()); arrowGrab.visible = false; arrowGrab.position.set(1.3, 0, 0); forward.group.add(arrowGrab);
     const cartMode = id === "inertia" ? "push" : id === "force-mass" ? "tap" : undefined;
-    label(id === "inertia" ? "Drag cart = push · drag arrow = force" : id === "force-mass" ? "Drag arrow = force · tap cart = mass" : "Drag the arrow to set thrust", 0, -1.45, 4.6, root, 11);
+    label(id === "inertia" ? "Drag cart = push · drag arrow = force" : id === "force-mass" ? "Drag arrow = force · tap cart = mass" : "Drag arrow = thrust · tap balloon = refill", 0, -1.45, 4.6, root, 11);
     const drag = { target: "", x: 0, value: 0 };
     const ranges = controls[id as keyof typeof controls];
     const snap = (which: 0 | 1, raw: number) => { const range = ranges[which]; return Math.min(range.max, Math.max(range.min, Math.round(raw / range.step) * range.step)); };
     const setArrow = (point: THREE.Vector3, api: InteractionApi) => { drag.target = "arrow"; const value = snap(0, (point.x - forward.group.position.x - 0.13 - 0.4) / 0.25); if (value !== api.values().a) api.setControl("a", value); };
     interact = {
-      targets: cartMode ? { cart, arrow: forward.group } : { arrow: forward.group },
+      targets: cartMode ? { cart, arrow: forward.group } : id === "launcher" ? { arrow: forward.group, balloon: balloonHit } : { arrow: forward.group },
       down: (name, point, api) => { if (name === "arrow") setArrow(point, api); },
       move: (name, point, moved, api) => {
         if (name === "arrow") setArrow(point, api);
@@ -223,7 +233,7 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       up: (name, _point, moved, api) => {
         if (name === "cart" && cartMode === "push" && moved >= 8) { api.setControl("b", drag.value); api.restart(); }
         else if (name === "cart" && cartMode === "tap" && moved < 8) { const next = api.values().b + ranges[1].step; api.setControl("b", next > ranges[1].max ? ranges[1].min : next); }
-        else if (name === "arrow") api.restart();
+        else if (name === "arrow" || (name === "balloon" && moved < 8)) api.restart();
         drag.target = "";
       },
       cancel: () => { drag.target = ""; },
@@ -231,23 +241,32 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     updates.push((time, a, b) => {
       const acceleration = a / (id === "inertia" ? 1 : b);
       const initialVelocity = id === "inertia" ? b : 0;
-      const distance = initialVelocity * time + 0.5 * acceleration * time * time;
-      const velocity = initialVelocity + acceleration * time;
+      // A launcher's thrust stops when the balloon is empty; after that the cart coasts at the speed it reached.
+      const thrustTime = id === "launcher" ? Math.min(time, BURN) : time, coast = id === "launcher" ? Math.max(0, time - BURN) : 0;
+      const distance = initialVelocity * thrustTime + 0.5 * acceleration * thrustTime * thrustTime + (initialVelocity + acceleration * thrustTime) * coast;
+      const velocity = initialVelocity + acceleration * thrustTime;
+      const live = id !== "launcher" || time < BURN || drag.target === "arrow";
       cart.position.x = drag.target === "cart" ? drag.x : -2 + distance % 4;
       cart.rotation.z = Math.min(0.07, acceleration * 0.012);
       wheels.forEach(wheel => { wheel.rotation.z = -distance / 0.13; });
       blocks.forEach((block, i) => { block.visible = id === "force-mass" && i < b; });
       // At zero force the arrow shows as a faint ghost, so there is something to grab and drag.
-      forward.group.visible = true; backward.group.visible = id === "launcher" && a > 0;
-      forward.group.children.slice(0, 2).forEach(part => { const material = (part as THREE.Mesh).material as THREE.MeshStandardMaterial; material.transparent = a === 0; material.opacity = a === 0 ? 0.3 : 1; material.depthWrite = a !== 0; });
+      const ghost = a === 0 || !live;
+      forward.group.visible = true; backward.group.visible = id === "launcher" && a > 0 && live;
+      forward.group.children.slice(0, 2).forEach(part => { const material = (part as THREE.Mesh).material as THREE.MeshStandardMaterial; material.transparent = ghost; material.opacity = ghost ? 0.3 : 1; material.depthWrite = !ghost; });
       forward.set(0.4 + a * 0.25); backward.set(0.4 + a * 0.25);
       streaks.material.opacity = Math.min(0.5, velocity * 0.16);
       for (let i = 0; i < 6; i++) { if (velocity <= 0.25) streaks.hide(i); else streaks.place(i, -0.55 - ((time * 2.4 + i / 6) % 1) * 0.7, 0.12 - (i % 3) * 0.13, (i < 3 ? -1 : 1) * 0.36, Math.min(1.6, 0.4 + velocity * 0.25), 1, 1); }
       if (id === "launcher") {
-        balloon.scale.set(1.5 - 0.6 * ((time * 0.5) % 1) * (a > 0 ? 1 : 0), 1, 1);
-        for (let i = 0; i < 10; i++) { if (a <= 0) { air.hide(i); continue; } const age = (time * (0.8 + a * 0.15) + i / 10) % 1; air.place(i, -0.6 - age * 1.3, 0.5 + Math.sin(i * 2.1) * 0.12 * age, 0, (0.6 + age * 1.6) * (1 - 0.6 * age)); }
+        // Air rushes out fastest at first, so the balloon empties quickly then slowly; it flutters at the nozzle while it does, then sags onto the tray.
+        const fill = a > 0 ? Math.pow(Math.max(0, 1 - time / BURN), 1.4) : 1;
+        const girth = 0.2 + 0.8 * fill;
+        balloon.scale.set(0.35 + 0.65 * fill, girth, girth);
+        balloon.position.set(-0.4, 0.145 + 0.34 * girth, 0);
+        balloon.rotation.z = Math.sin(time * 38) * 0.045 * (a / 6) * Math.min(1, fill * 3) - 0.14 * (1 - fill);
+        for (let i = 0; i < 10; i++) { if (a <= 0 || fill < 0.03) { air.hide(i); continue; } const age = (time * (0.8 + a * 0.15) + i / 10) % 1; air.place(i, -0.45 - age * 1.3, balloon.position.y + Math.sin(i * 2.1) * 0.12 * age, 0, (0.6 + age * 1.6) * (1 - 0.6 * age) * (0.5 + 0.5 * fill)); }
       }
-      forceLabel.set(drag.target === "cart" ? `Push: v₀ = ${drag.value} m/s` : drag.target === "arrow" ? `Force = ${a} N` : id === "launcher" ? `Equal forces: ${a} N each` : `a = ${acceleration.toFixed(2)} m/s²`);
+      forceLabel.set(drag.target === "cart" ? `Push: v₀ = ${drag.value} m/s` : drag.target === "arrow" ? `Force = ${a} N` : id === "launcher" ? (live ? `Equal forces: ${a} N each` : "Balloon empty: no thrust, the cart coasts") : `a = ${acceleration.toFixed(2)} m/s²`);
     });
   } else if (["series", "parallel", "home-circuit"].includes(id)) {
     mesh(new RoundedBoxGeometry(5.6, 3.7, 0.1, 3, 0.05), 0x1d3557, 0, 0.4, -0.2, root, { roughness: 0.8 });
