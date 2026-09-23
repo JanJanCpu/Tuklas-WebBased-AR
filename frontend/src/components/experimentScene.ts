@@ -127,6 +127,12 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     return { sprite, set };
   };
 
+  // An invisible box the pointer can grab. Keep it thin in z so nearer, visible pieces are picked first.
+  const hitBox = (w: number, h: number, d: number, x: number, y: number, z: number) => {
+    const group = new THREE.Group(); group.position.set(x, y, z); root.add(group);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshBasicMaterial()); box.visible = false; group.add(box); return group;
+  };
+
   // Solid arrow (WebGL lines are always one pixel wide, which read as hairlines on a phone).
   const arrow = (color: number, parent: THREE.Object3D = root) => {
     const group = new THREE.Group(); parent.add(group);
@@ -785,26 +791,63 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     });
   } else if (id === "replication") {
     // Two strands twist round each other. "Separate and copy" unzips them from the left, and a new strand (orange) builds on each old one (blue).
-    const SLOTS = 6, SUB = 5, X0 = -1.75, STEP = 0.7, R = 0.4, TWIST = 1.05, SPLIT = 0.85, OLD = 0x2f5d8a, NEW = 0xf08a3c;
+    const SLOTS = 6, SUB = 5, X0 = -1.75, STEP = 0.7, R = 0.4, TWIST = 1.05, SPLIT = 1.05, OLD = 0x2f5d8a, NEW = 0xf08a3c;
     // Strands: 0 = the original template, 1 = its partner, 2 and 3 = the new strands that pair with them.
     const rungs = oriented(new THREE.CylinderGeometry(1, 1, 1, 10), 4 * SLOTS);
     const joints = oriented(new THREE.SphereGeometry(1, 14, 10), 4 * SLOTS, root, { roughness: 0.3 });
     const links = oriented(new THREE.CylinderGeometry(1, 1, 1, 8), 4 * SLOTS * SUB);
     const letters = Array.from({ length: 4 * SLOTS }, () => letter(0.3));
-    const captions = [label("", 0, 1.9, 4.6, root, 12), label("", 0, -1.9, 4.6, root, 12)];
+    const captions = [label("", 0, 2.05, 4.6, root, 14), label("", 0, -2.05, 4.6, root, 14)];
     const joint = Array.from({ length: 4 * SLOTS }, () => new THREE.Vector3());
     const shown = Array<number>(4 * SLOTS).fill(0.45);
     const cyAt = Array<number>(4 * SLOTS).fill(0), seenAt = Array<number>(4 * SLOTS).fill(0);
     const axis = new THREE.Vector3(), out = new THREE.Vector3(), from = new THREE.Vector3(), to = new THREE.Vector3();
-    const hit = new THREE.Group(); root.add(hit);
-    const hitBox = new THREE.Mesh(new THREE.BoxGeometry(4.6, 3, 1.6), new THREE.MeshBasicMaterial()); hitBox.visible = false; hit.add(hitBox);
-    interact = { targets: { dna: hit }, up: (_name, _point, moved, api) => { if (moved < 8) api.setControl("a", api.values().a ? 0 : 1); } };
+    // Touch: pull the helix apart (or tap it), drag a nucleotide onto the new strand, tap a placed base to take it back.
+    const hit = hitBox(4.6, 3.6, 0.2, 0, 0, -0.1);
+    const slotHits = Array.from({ length: 12 }, (_, n) => hitBox(0.62, 0.95, 0.2, X0 + (n % 6) * STEP, n < 6 ? SPLIT : -SPLIT, 0.3));
+    const tokens = ["A", "T", "C", "G"].map((base, t) => {
+      const group = new THREE.Group(); root.add(group);
+      mesh(new THREE.SphereGeometry(0.15, 18, 12), baseColors[base], 0, 0, 0, group, { roughness: 0.3, emissive: baseColors[base], emissiveIntensity: 0.3 });
+      const chip = letter(0.3, group); chip.set(base); chip.sprite.position.set(0, 0, 0.2);
+      return { base, group, home: -0.9 + t * 0.6, x: -0.9 + t * 0.6, y: 0 };
+    });
+    const pick = glow(0xffd657, 0.9);
+    const held = { name: "", x: 0, y: 0, y0: 0 };
+    const nearestSlot = (x: number, y: number) => {
+      let best = -1, bestDistance = 0.55;
+      for (let n = 0; n < 12; n++) { const d = Math.hypot(x - (X0 + (n % 6) * STEP), y - (n < 6 ? SPLIT : -SPLIT)); if (d < bestDistance) { best = n; bestDistance = d; } }
+      return best;
+    };
+    interact = {
+      targets: { dna: hit, ...Object.fromEntries(tokens.map((token, t) => [`token${t}`, token.group])), ...Object.fromEntries(slotHits.map((group, n) => [`slot${n}`, group])) },
+      down: (name, point) => { held.name = name; held.x = point.x; held.y = held.y0 = point.y; },
+      move: (name, point, _moved, api) => { held.x = point.x; held.y = point.y; if (name === "dna" && !api.values().a && Math.abs(point.y - held.y0) > 0.35) api.setControl("a", 1); },
+      up: (name, point, moved, api) => {
+        const { a, lab } = api.values();
+        if (name === "dna") { if (moved < 8) api.setControl("a", a ? 0 : 1); }
+        else if (name.startsWith("slot")) { if (moved < 8) { const next = [...lab.basePairs]; next[Number(name.slice(4))] = ""; api.setLab({ basePairs: next }); } }
+        else if (name.startsWith("token")) { const n = nearestSlot(point.x, point.y); if (n >= 0) { const next = [...lab.basePairs]; next[n] = tokens[Number(name.slice(5))].base; api.setLab({ basePairs: next }); } }
+        held.name = "";
+      },
+      cancel: () => { held.name = ""; },
+    };
     let k = 0, last = 0;
     updates.push((time, a, b, lab) => {
       const dt = Math.max(0, Math.min(0.1, time - last)); last = time;
       k += (a - k) * Math.min(1, dt * 3); if (Math.abs(a - k) < 0.003) k = a;
       root.rotation.y = b * Math.PI / 12;
       const spin = time * 0.45;
+      // Nucleotide tokens wait in the gap between the two molecules and follow the finger while held.
+      const ready = a === 1 && k > 0.85;
+      tokens.forEach((token, t) => {
+        const grabbed = held.name === `token${t}`, follow = Math.min(1, dt * (grabbed ? 30 : 10));
+        token.x += ((grabbed ? held.x : token.home) - token.x) * follow; token.y += ((grabbed ? held.y : 0) - token.y) * follow;
+        token.group.visible = ready; token.group.position.set(token.x, token.y, grabbed ? 0.6 : 0.3); token.group.scale.setScalar(grabbed ? 1.3 : 1);
+      });
+      slotHits.forEach(group => { group.visible = ready; });
+      const near = held.name.startsWith("token") ? nearestSlot(held.x, held.y) : -1;
+      pick.material.opacity = near >= 0 ? 0.55 + 0.2 * Math.sin(time * 8) : 0;
+      if (near >= 0) pick.position.set(X0 + (near % 6) * STEP, near < 6 ? SPLIT : -SPLIT, 0.4);
       for (let s = 0; s < 4; s++) for (let i = 0; i < SLOTS; i++) {
         const n = s * SLOTS + i, fresh = s > 1;
         // The fork opens from the left: each column lets go a little after the one before it.
@@ -835,8 +878,9 @@ export function createExperimentScene(root: THREE.Group, id: string) {
         links.span(n, along(s, i - 1 + f / SUB, from), along(s, i - 1 + (f + 1) / SUB, to), 0.04 * seenAt[s * SLOTS + i], s > 1 ? NEW : OLD);
       }
       rungs.dirty(); joints.dirty(); links.dirty();
-      captions[0].set(a ? "Daughter 1: old strand (blue) + new strand (orange)" : "Original DNA: two paired strands");
-      captions[1].set(a ? "Daughter 2: old strand (blue) + new strand (orange)" : "Tap the DNA to separate it and copy");
+      const done = lab.basePairs.filter((base, i) => base === (i < 6 ? complement(template[i]) : template[i])).length;
+      captions[0].set(!a ? "Original DNA: two paired strands" : done === 12 ? "Both copies match the original" : "Daughter 1: old strand (blue) + new strand (orange)");
+      captions[1].set(!a ? "Pull the strands apart, or tap, to copy it" : done === 12 ? "Each copy = one old strand + one new strand" : "Drag A, T, C or G onto the new strands");
     });
   } else if (id === "mutation") {
     // Both rows share one x scale, so an insertion or deletion visibly pushes every later base along and regroups the codons under it.
@@ -862,12 +906,17 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     const ghostChip = letter(0.22);
     const spot = glow(0xffd657, 1);
     const caret = mesh(new THREE.ConeGeometry(0.1, 0.22, 14), 0xffb020, 0, 1.8, 0.1, root, { emissive: 0xffb020, emissiveIntensity: 0.5 }); caret.rotation.z = Math.PI;
-    const captions = [label("Original coding DNA (5\u2032 \u2192 3\u2032) · tap a base to pick it", 0, 2.18, 4.8, root, 12), label("Edited coding DNA · groups of 3 = codons", 0, 0.24, 4.4, root, 12), label("", 0, -1.75, 4.4, root, 12)];
-    const hits = Array.from({ length: 12 }, (_, j) => {
-      const group = new THREE.Group(); group.position.set(slotX(j), ROW[0], 0); root.add(group);
-      const box = new THREE.Mesh(new THREE.BoxGeometry(STEP, 0.9, 0.9), new THREE.MeshBasicMaterial()); box.visible = false; group.add(box); return group;
-    });
-    interact = { targets: Object.fromEntries(hits.map((group, j) => [`base${j}`, group])), up: (name, _point, moved, api) => { if (moved < 8) api.setControl("b", Number(name.slice(4)) + 1); } };
+    const captions = [label("Original coding DNA (5\u2032 \u2192 3\u2032) · tap or slide to pick a base", 0, 2.18, 4.8, root, 14), label("Edited coding DNA · groups of 3 = codons", 0, 0.24, 4.4, root, 12), label("", 0, -1.72, 4.4, root, 12), label("", 0, -2.12, 4.4, root, 14)];
+    // Touch: tap a base, or slide a finger along the original strand, to pick where the mutation happens; tap the bottom chip to change its type.
+    const hits = Array.from({ length: 12 }, (_, j) => hitBox(STEP + 0.02, 0.9, 0.9, slotX(j), ROW[0], 0));
+    const typeHit = hitBox(4.4, 0.4, 0.2, 0, -2.12, 0.3);
+    const nearestBase = (x: number) => { let best = 0; for (let j = 1; j < 12; j++) if (Math.abs(slotX(j) - x) < Math.abs(slotX(best) - x)) best = j; return best; };
+    interact = {
+      targets: { type: typeHit, ...Object.fromEntries(hits.map((group, j) => [`base${j}`, group])) },
+      down: (name, _point, api) => { if (name.startsWith("base")) api.setControl("b", Number(name.slice(4)) + 1); },
+      move: (name, point, _moved, api) => { if (name.startsWith("base")) { const j = nearestBase(point.x) + 1; if (j !== api.values().b) api.setControl("b", j); } },
+      up: (name, _point, moved, api) => { if (name === "type" && moved < 8) api.setControl("a", (api.values().a + 1) % 4); },
+    };
     let caretX = NaN, last = 0;
     updates.push((time, a, b) => {
       const dt = Math.max(0, Math.min(0.1, time - last)); last = time;
@@ -943,6 +992,7 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       const cx = slotX(i); caretX = Number.isNaN(caretX) ? cx : caretX + (cx - caretX) * ease;
       caret.position.set(caretX, ROW[0] + 0.45 + Math.sin(time * 4) * 0.03, 0.1);
       captions[2].set(mutation.effect === "Original sequence" ? "Pick a mutation to see how the protein changes" : mutation.effect);
+      captions[3].set(`Tap here to change the mutation: ${["Original", "Substitution", "Insertion", "Deletion"][a]}`);
       rungs.dirty(); joints.dirty(); links.dirty(); beads.dirty();
     });
   } else throw new Error(`Unknown experiment: ${id}`);
