@@ -6,12 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Tuklas AR Science Lab: an offline-first WebAR PWA for Grade 9 Predict-Observe-Explain (POE) science activities, with marker-based AR (AR.js) and a Three.js 3D fallback. npm workspaces monorepo: `frontend` (React 19 + Vite + TypeScript) and `backend` (Express + TypeScript + Prisma/PostgreSQL).
 
-Capstone: "Development of an Offline Augmented Reality Science Laboratory Simulator Using the Prediction-Observation-Explanation Approach for Resource-Limited Public Grade 9 Classrooms in Manila." Authors: Jan Aldridge S. Pesa (BSIT, PLM, the user of this fork) and Earl Stephen E. Dulay (owns the original repo and frontend deployment). Adviser: Dr. Criselle J. Centeno. The thesis was **defended in September 2026**.
+Capstone: "Development of an Offline Augmented Reality Science Laboratory Simulator Using the Prediction-Observation-Explanation Approach for Resource-Limited Public Grade 9 Classrooms in Manila." Authors: Jan Aldridge S. Pesa (BSIT, PLM, the user of this fork) and Earl Stephen E. Dulay (owns the original repo and frontend deployment). Adviser: Dr. Criselle J. Centeno. **Defense is scheduled for October 2026 (2nd or 3rd week), not yet held.** Earlier notes in this file said "defended in September 2026" — that was wrong; correct as of 2026-09-28.
 
 ## Project phases and current state
 
-1. **Pre-defense (done):** thesis audit against the code, research instruments, real bug fixes, Chapter 4/5 written from real data only, Appendices A-E. Never fabricate results, scores or logs; every number in the thesis comes from the real pilot data.
-2. **Post-defense (in progress):** the teacher wants the AR more dynamic ("Pokemon GO level", less flat and static, replacing physical lab objects, hand/touch manipulation). All of this lives on the fork branch `feature/dynamic-ar`. Latest build label: **b27**.
+This is **pre-defense**, in a dedicated polish window before the panel and before school testing:
+1. Thesis audit against the code, research instruments, and Chapter 4/5 drafted from real data only are done. Never fabricate results, scores or logs; every number in the thesis comes from the real pilot data.
+2. **Now (through the polish window):** the adviser/panel wants the AR more dynamic ("Pokemon GO level", less flat and static, replacing physical lab objects, hand/touch manipulation) and the general app UI polished, before the upgraded build is used for real SOP1/2/3 testing at Antonio A. Maceda Integrated School (letters 1/2/6 are for arranging that testing) and before the October defense. All of this lives on the fork branch `feature/dynamic-ar`. Latest build label: **b27**.
+3. **After school testing, before the defense:** the real data from that testing (curriculum validation, pretest/posttest, SUS) needs to go into Chapter 4/5 and the appendices, replacing/extending whatever pilot data is there now.
 
 Open items:
 - Phone test of Redmi A3 with `?fps=1&q=2` (expect readout `q2 d2 t320`): does 320x240 tracking reach 24+ fps with a steady marker?
@@ -106,6 +108,9 @@ Every app update re-downloads the whole precache. Files under `mediapipe/` are *
 `main.tsx` wraps `<App />` in `components/ErrorBoundary.tsx` (shows a "Reload" screen instead of a blank page). Treat "blank screen" reports as an uncaught-exception hunt first (browser console), not stale cache.
 
 `ScienceScene.tsx` is `React.lazy()`-loaded from `App.tsx` inside one `<Suspense fallback={null}>` around the Observe screen's `ar-frame` div (covers `ActivityVisual`'s inner fallback use too). `data/modules.ts` lives in `backend/src/data`; `frontend/src/data/modules.ts` re-exports it, giving one source of truth (bundled fallback library, also seeded to Postgres via `POST /api/modules/seed`). 12 modules: inertia, force-mass, launcher, series, parallel, home-circuit, seismic, earth-scale, replication, mutation, chemical-change, bonding.
+
+### App-wide UI polish (2026-09-28)
+`styles.css` has one shared `--radius: 14px` token (was a flat 8px on every card, button and input; small circular/pill chips like nav badges keep their own `50%`/`999px` radius, untouched). Bottom nav (`App.tsx`) shows a `lucide-react` icon above each label (`Home`/`BookOpen`/`Users`/`Settings`) instead of text alone, with a small scale/colour transition on the active tab. The landing screen's Predict/Observe/Explain strip (`.landing-flow`) was previously three plain boxes that looked like dead buttons; it's now a non-interactive numbered step diagram (circle badge + connecting line + one-line hint per step) so it doesn't imply it's tappable. Deliberately left alone: the navy/red/gold PLM palette (institutional branding, keep it) and the system font stack (a custom webfont would bloat the offline precache). Still open: screen-transition animation between `screen-stack` views (currently an instant `display:none`/`grid` swap), and an audit of empty/loading state copy.
 
 ### Backend structure
 

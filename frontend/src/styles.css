@@ -11,6 +11,9 @@
   --panel: #ffffff;
   --shadow: 0 12px 28px rgba(15, 76, 154, 0.12);
   --camera: #27344d;
+  /* A softer, friendlier corner radius for cards, buttons and other main surfaces.
+     Small functional chips (badges, dots, pills) keep their own tighter radius. */
+  --radius: 14px;
 }
 
 * {
@@ -119,7 +122,7 @@ small {
 .landing-marker {
   width: min(420px, 100%);
   margin: 0 auto;
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 
 .landing-hero {
@@ -145,17 +148,52 @@ small {
 .landing-flow {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  gap: 10px;
+  padding: 4px 0;
 }
 
+/* Non-interactive steps, deliberately not styled like buttons: no border/fill box,
+   just a numbered badge over a label, connected by a line so it reads as a flow. */
 .landing-flow article {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 6px 4px 0;
+  color: rgba(255, 255, 255, 0.92);
+  text-align: center;
+}
+
+.landing-flow article:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 15px;
+  left: calc(50% + 24px);
+  width: calc(100% - 34px);
+  height: 2px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.landing-flow-step {
   display: grid;
   place-items: center;
-  min-height: 58px;
-  border: 1px solid rgba(255, 255, 255, 0.38);
-  border-radius: 8px;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.12);
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 0.85rem;
+  font-weight: 900;
+}
+
+.landing-flow article strong {
+  font-size: 0.85rem;
+}
+
+.landing-flow article small {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.68rem;
+  line-height: 1.25;
 }
 
 .landing-marker {
@@ -177,7 +215,7 @@ small {
 .text-button {
   width: 100%;
   min-height: 46px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   cursor: pointer;
   font-weight: 800;
 }
@@ -232,7 +270,7 @@ small {
   min-height: 48px;
   padding: 8px 10px;
   border: 1px solid rgba(255, 255, 255, 0.35);
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: #fff;
   background: rgba(255, 255, 255, 0.1);
   text-align: left;
@@ -323,7 +361,7 @@ small {
   width: 44px;
   height: 44px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: var(--ink);
   background: var(--surface);
   cursor: pointer;
@@ -407,7 +445,7 @@ small {
 .result-card,
 .record-card {
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--panel);
   box-shadow: var(--shadow);
 }
@@ -436,7 +474,7 @@ small {
   width: 44px;
   height: 44px;
   border: 1px solid rgba(15, 76, 154, 0.22);
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: var(--blue);
   background: #eaf2ff;
 }
@@ -629,7 +667,7 @@ button.module-progress-row {
 textarea {
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: var(--ink);
   background: #fff;
 }
@@ -660,7 +698,7 @@ textarea {
   place-items: center;
   min-height: 52px;
   border: 1px dashed var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: var(--muted);
   font-weight: 900;
 }
@@ -691,7 +729,7 @@ textarea {
   min-height: 42px;
   padding: 8px 10px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: #fbfdff;
 }
 
@@ -707,7 +745,7 @@ input[type="range"] {
   min-height: 0;
   overflow: hidden;
   border: 2px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background:
     linear-gradient(transparent 31px, rgba(255, 255, 255, 0.13) 32px),
     linear-gradient(90deg, transparent 31px, rgba(255, 255, 255, 0.13) 32px),
@@ -726,7 +764,7 @@ input[type="range"] {
   margin: 0;
   padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 
 .prediction-question legend {
@@ -826,10 +864,10 @@ input[type="range"] {
 .module-card > span { min-width: 0; }
 .module-card strong, .module-card small { overflow-wrap: anywhere; }
 .bond-workbench, .dna-workbench, .earth-workbench { margin: 16px 0; }
-.bond-workbench button, .earth-workbench button { min-height: 44px; padding: 10px 14px; margin: 4px; border: 1px solid var(--line); border-radius: 8px; background: #edf5fc; color: var(--ink); }
+.bond-workbench button, .earth-workbench button { min-height: 44px; padding: 10px 14px; margin: 4px; border: 1px solid var(--line); border-radius: var(--radius); background: #edf5fc; color: var(--ink); }
 .bond-workbench .electron-token { background: #ffe9a4; touch-action: none; cursor: grab; }
 .bond-workbench [data-electron-target] { border: 2px dashed var(--blue); }
-.dna-workbench fieldset { margin: 12px 0; padding: 10px; border: 1px solid var(--line); border-radius: 8px; }
+.dna-workbench fieldset { margin: 12px 0; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius); }
 .base-choice { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px; width: 100px; margin: 8px; }
 .base-choice select { min-height: 44px; padding: 6px; }
 .base-choice small { flex-basis: 100%; }
@@ -983,7 +1021,7 @@ input[type="range"] {
   min-height: 64px;
   padding: 10px;
   border: 2px solid #172033;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.9);
   font-weight: 900;
   text-align: center;
@@ -1150,7 +1188,7 @@ input[type="range"] {
 .tool-grid button {
   min-height: 54px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: var(--blue);
   font-weight: 800;
   background: #fff;
@@ -1201,7 +1239,7 @@ input[type="range"] {
 .data-readout span {
   padding: 10px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   text-align: center;
   background: #f8fbff;
 }
@@ -1275,14 +1313,25 @@ input[type="range"] {
 }
 
 .bottom-nav button {
-  display: block;
+  display: grid;
+  place-items: center;
+  gap: 3px;
   min-height: 54px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: var(--muted);
   background: transparent;
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 800;
+  transition: color 150ms ease, background 150ms ease;
+}
+
+.bottom-nav button svg {
+  transition: transform 150ms ease;
+}
+
+.bottom-nav button.active svg {
+  transform: translateY(-1px) scale(1.05);
 }
 
 .motion-trials {
@@ -1333,7 +1382,7 @@ input[type="range"] {
   max-width: 520px;
   margin: 0 auto;
   padding: 12px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: #fff;
   text-align: center;
   background: var(--blue-dark);
@@ -1365,7 +1414,7 @@ input[type="range"] {
   }
 
   .app-header {
-    border-radius: 0 0 8px 8px;
+    border-radius: 0 0 var(--radius) var(--radius);
   }
 }
 
@@ -1451,7 +1500,7 @@ input[type="range"] {
 .auth-tabs button {
   min-height: 40px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: var(--muted);
   cursor: pointer;
   background: #fff;
@@ -1491,7 +1540,7 @@ input[type="range"] {
   margin: 0 0 12px;
   padding: 10px 12px;
   border: 1px solid rgba(15, 76, 154, 0.28);
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: var(--blue);
   font-size: 0.8rem;
   font-weight: 700;

@@ -8,7 +8,7 @@ import { getObservationModel, getObservationDefaults, formatControlValue, initia
 import { ExperimentControls } from "./components/ExperimentControls";
 import { AccountDetails } from "./components/AccountDetails";
 import type { ActivityRecord, AuthUser, ClassProgressRecord, Feedback, LearningModule, Role, Screen, Section, SectionSummary, Stage, ViewMode } from "./types/domain";
-import { Activity, CircuitBoard, Download, Earth, Microscope, Printer, Thermometer, type LucideIcon } from "lucide-react";
+import { Activity, BookOpen, CircuitBoard, Download, Earth, Home, Microscope, Printer, Settings, Thermometer, Users, type LucideIcon } from "lucide-react";
 
 // three.js (pulled in by ScienceScene) is a heavy dependency that only the
 // Observe screen and its fallback 3D preview need - lazy-loading it keeps
@@ -636,7 +636,17 @@ function Workspace({ user }: { user: AuthUser | null }) {
           )}
         </section>
         <section className="landing-flow" aria-label="Learning flow">
-          {["Predict", "Observe", "Explain"].map((step) => <article key={step}><strong>{step}</strong></article>)}
+          {[
+            ["Predict", "Guess what will happen"],
+            ["Observe", "Watch it play out in AR"],
+            ["Explain", "Say why it happened"],
+          ].map(([step, hint], index) => (
+            <article key={step}>
+              <span className="landing-flow-step">{index + 1}</span>
+              <strong>{step}</strong>
+              <small>{hint}</small>
+            </article>
+          ))}
         </section>
         <section className="landing-marker">
           <div>
@@ -1143,9 +1153,11 @@ function Workspace({ user }: { user: AuthUser | null }) {
             screen === item ||
             (item === "modules" && previewFlowScreens.includes(screen)) ||
             ((screen === "section" || screen === "grade") && item === "classes");
+          const NavIcon = ({ home: Home, modules: BookOpen, classes: Users, settings: Settings } as Partial<Record<Screen, LucideIcon>>)[item]!;
           return (
             <button key={item} className={isActive ? "active" : ""} onClick={() => goTo(item)}>
-              {item === "modules" ? "Modules" : item === "classes" ? "Classes" : item[0].toUpperCase() + item.slice(1)}
+              <NavIcon size={22} strokeWidth={isActive ? 2.4 : 2} aria-hidden="true" />
+              <span>{item === "modules" ? "Modules" : item === "classes" ? "Classes" : item[0].toUpperCase() + item.slice(1)}</span>
             </button>
           );
         })}
