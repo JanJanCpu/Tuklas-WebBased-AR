@@ -218,12 +218,14 @@ small {
   border-radius: var(--radius);
   cursor: pointer;
   font-weight: 800;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
 
 .primary-button {
   border: 0;
   color: #fff;
   background: var(--blue);
+  box-shadow: 0 10px 22px rgba(15, 76, 154, 0.32);
 }
 
 .secondary-button,
@@ -231,6 +233,32 @@ small {
   border: 1px solid var(--blue);
   color: var(--blue);
   background: #fff;
+}
+
+/* A light press-down on every clickable surface, skipped for touch-only devices
+   since a lingering :active state on tap feels sticky rather than tactile there. */
+@media (hover: hover) and (pointer: fine) {
+  .primary-button:not(:disabled):hover {
+    box-shadow: 0 12px 26px rgba(15, 76, 154, 0.4);
+  }
+
+  .module-card:hover,
+  .settings-row:hover,
+  .task-card:hover,
+  .account-indicator:hover {
+    box-shadow: 0 14px 30px rgba(15, 76, 154, 0.16);
+    transform: translateY(-1px);
+  }
+}
+
+.primary-button:not(:disabled):active,
+.secondary-button:not(:disabled):active,
+.text-button:not(:disabled):active,
+.module-card:active,
+.settings-row:active,
+.task-card:active,
+.compact-button:not(:disabled):active {
+  transform: scale(0.98);
 }
 
 .compact-button {
@@ -468,6 +496,7 @@ small {
   border-radius: var(--radius);
   background: var(--panel);
   box-shadow: var(--shadow);
+  transition: transform 120ms ease, box-shadow 120ms ease;
 }
 
 .hero-card,
@@ -653,6 +682,7 @@ button.module-progress-row {
   color: inherit;
   text-align: left;
   cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
 }
 
 .task-card,
@@ -1564,6 +1594,9 @@ input[type="range"] {
 }
 
 .teacher-preview-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
   margin: 0 0 12px;
   padding: 10px 12px;
   border: 1px solid rgba(15, 76, 154, 0.28);
@@ -1572,6 +1605,11 @@ input[type="range"] {
   font-size: 0.8rem;
   font-weight: 700;
   background: #eaf2ff;
+}
+
+.teacher-preview-note svg {
+  flex-shrink: 0;
+  margin-top: 1px;
 }
 
 .locked-notice {

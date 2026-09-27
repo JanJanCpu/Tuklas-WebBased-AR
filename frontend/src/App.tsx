@@ -8,7 +8,7 @@ import { getObservationModel, getObservationDefaults, formatControlValue, initia
 import { ExperimentControls } from "./components/ExperimentControls";
 import { AccountDetails } from "./components/AccountDetails";
 import type { ActivityRecord, AuthUser, ClassProgressRecord, Feedback, LearningModule, Role, Screen, Section, SectionSummary, Stage, ViewMode } from "./types/domain";
-import { Activity, BookOpen, ChevronLeft, ChevronRight, CircuitBoard, Download, Earth, Home, Microscope, Printer, Settings, Thermometer, Users, type LucideIcon } from "lucide-react";
+import { Activity, BookOpen, ChevronLeft, ChevronRight, CircuitBoard, Download, Earth, Eye, Home, Microscope, Printer, Settings, Thermometer, Users, type LucideIcon } from "lucide-react";
 
 // three.js (pulled in by ScienceScene) is a heavy dependency that only the
 // Observe screen and its fallback 3D preview need - lazy-loading it keeps
@@ -797,7 +797,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
 
         {screen === "detail" && (
           <section className="screen active">
-            {isTeacherPreview && <p className="teacher-preview-note">Teacher Preview - explore this lesson before assigning it. Nothing here is saved as student work.</p>}
+            {isTeacherPreview && <p className="teacher-preview-note"><Eye size={16} strokeWidth={2.4} aria-hidden="true" /><span>Teacher Preview - explore this lesson before assigning it. Nothing here is saved as student work.</span></p>}
             <article className="panel-card">
               <div className="module-summary">
                 <ModuleIcon moduleId={activeModule.id} />
@@ -859,7 +859,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
 
         {screen === "observe" && (
           <section className="screen active">
-            {isTeacherPreview && <p className="teacher-preview-note">Teacher Preview - trials run normally but aren't saved as student work.</p>}
+            {isTeacherPreview && <p className="teacher-preview-note"><Eye size={16} strokeWidth={2.4} aria-hidden="true" /><span>Teacher Preview - trials run normally but aren't saved as student work.</span></p>}
             <article className="ar-panel">
               <div className="row-between">
                 <div><p className="eyebrow">{viewMode === "ar" ? "Camera Mode" : "3D Model Mode"}</p><h2>{viewMode === "ar" ? "Start the camera and observe the trial" : "Use the model when camera access is unavailable"}</h2></div>
@@ -916,7 +916,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
 
         {screen === "explain" && (
           <section className="screen active">
-            {isTeacherPreview && <p className="teacher-preview-note">Teacher Preview - your write-up here isn't saved as student work.</p>}
+            {isTeacherPreview && <p className="teacher-preview-note"><Eye size={16} strokeWidth={2.4} aria-hidden="true" /><span>Teacher Preview - your write-up here isn't saved as student work.</span></p>}
             {explainLocked ? (
               <article className="panel-card locked-notice">
                 <p className="eyebrow">Explanation Submitted</p>
