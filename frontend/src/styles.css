@@ -402,8 +402,12 @@ small {
 }
 
 .back-button {
+  display: grid;
+  place-items: center;
   visibility: hidden;
-  font-size: 1.6rem;
+  width: 38px;
+  height: 38px;
+  padding: 0;
 }
 
 .back-button.visible {
@@ -658,6 +662,13 @@ button.module-progress-row {
 
 .module-card {
   grid-template-columns: 44px minmax(0, 1fr) auto auto;
+}
+
+.row-chevron {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--muted);
 }
 
 .task-card {

@@ -8,7 +8,7 @@ import { getObservationModel, getObservationDefaults, formatControlValue, initia
 import { ExperimentControls } from "./components/ExperimentControls";
 import { AccountDetails } from "./components/AccountDetails";
 import type { ActivityRecord, AuthUser, ClassProgressRecord, Feedback, LearningModule, Role, Screen, Section, SectionSummary, Stage, ViewMode } from "./types/domain";
-import { Activity, BookOpen, CircuitBoard, Download, Earth, Home, Microscope, Printer, Settings, Thermometer, Users, type LucideIcon } from "lucide-react";
+import { Activity, BookOpen, ChevronLeft, ChevronRight, CircuitBoard, Download, Earth, Home, Microscope, Printer, Settings, Thermometer, Users, type LucideIcon } from "lucide-react";
 
 // three.js (pulled in by ScienceScene) is a heavy dependency that only the
 // Observe screen and its fallback 3D preview need - lazy-loading it keeps
@@ -681,7 +681,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
   return (
     <div className={`${role}-mode`}>
       <header className="app-header">
-        <button className={`back-button ${(history.length > 0 || selectedQuarter !== null) && screen !== "home" ? "visible" : ""}`} onClick={goBack} aria-label="Go back">&lt;</button>
+        <button className={`back-button ${(history.length > 0 || selectedQuarter !== null) && screen !== "home" ? "visible" : ""}`} onClick={goBack} aria-label="Go back"><ChevronLeft size={20} strokeWidth={2.6} /></button>
         <div>
           <p className="eyebrow">{titles[screen][0]}</p>
           <h1>{titles[screen][1]}</h1>
@@ -783,13 +783,13 @@ function Workspace({ user }: { user: AuthUser | null }) {
                 const items = visibleModules.filter(item => item.quarterNumber === quarter);
                 if (!items.length) return null;
                 const moduleCount = new Set(items.map(i => i.groupId)).size;
-                return <button className="module-card" key={quarter} onClick={() => setSelectedQuarter(quarter)}><span className="module-icon">Q{quarter}</span><span><strong>{items[0].quarter}</strong><small>{moduleCount} module{moduleCount === 1 ? "" : "s"}, {items.length} experiment{items.length === 1 ? "" : "s"}</small></span><span aria-hidden="true">&gt;</span></button>;
+                return <button className="module-card" key={quarter} onClick={() => setSelectedQuarter(quarter)}><span className="module-icon">Q{quarter}</span><span><strong>{items[0].quarter}</strong><small>{moduleCount} module{moduleCount === 1 ? "" : "s"}, {items.length} experiment{items.length === 1 ? "" : "s"}</small></span><span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span></button>;
               })}
               {selectedQuarter && !selectedGroup && [...new Set(visibleModules.filter(item => item.quarterNumber === selectedQuarter).map(item => item.groupId))].map(group => {
                 const items = visibleModules.filter(item => item.groupId === group);
-                return <button className="module-card" key={group} onClick={() => setSelectedGroup(group)}><ModuleIcon moduleId={group} /><span><strong>{items[0].moduleNumber}. {items[0].moduleTitle}</strong><small>{items.length} POE experiments</small></span><span aria-hidden="true">&gt;</span></button>;
+                return <button className="module-card" key={group} onClick={() => setSelectedGroup(group)}><ModuleIcon moduleId={group} /><span><strong>{items[0].moduleNumber}. {items[0].moduleTitle}</strong><small>{items.length} POE experiments</small></span><span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span></button>;
               })}
-              {selectedGroup && visibleModules.filter(item => item.groupId === selectedGroup).map(item => <button className="module-card" key={item.id} onClick={() => { setActiveModule(item); goTo("detail"); }}><ModuleIcon moduleId={item.id} /><span><strong>{item.title}</strong><small>{item.subtitle}</small><small>{stagesFor(records, item.id).size ? `${REQUIRED_STAGES.filter(stage => stagesFor(records, item.id).has(stage)).length}/3 POE stages complete` : "Ready to explore"}</small></span><span aria-hidden="true">&gt;</span></button>)}
+              {selectedGroup && visibleModules.filter(item => item.groupId === selectedGroup).map(item => <button className="module-card" key={item.id} onClick={() => { setActiveModule(item); goTo("detail"); }}><ModuleIcon moduleId={item.id} /><span><strong>{item.title}</strong><small>{item.subtitle}</small><small>{stagesFor(records, item.id).size ? `${REQUIRED_STAGES.filter(stage => stagesFor(records, item.id).has(stage)).length}/3 POE stages complete` : "Ready to explore"}</small></span><span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span></button>)}
               {!visibleModules.some(item => (!selectedQuarter || item.quarterNumber === selectedQuarter) && (!selectedGroup || item.groupId === selectedGroup)) && <p>No matching experiments. Try another search.</p>}
             </div>
           </section>
@@ -979,14 +979,14 @@ function Workspace({ user }: { user: AuthUser | null }) {
         {screen === "settings" && (
           <section className="screen active">
             {!installed && installPrompt && (
-              <button className="settings-row" onClick={installApp}><span><strong>Install App</strong><small>Add Tuklas to your home screen, like a regular app.</small></span><span aria-hidden="true">&gt;</span></button>
+              <button className="settings-row" onClick={installApp}><span><strong>Install App</strong><small>Add Tuklas to your home screen, like a regular app.</small></span><span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span></button>
             )}
             {installed && (
               <article className="panel-card"><p className="eyebrow">Installed</p><p>Tuklas is installed on this device.</p></article>
             )}
-            <button className="settings-row" onClick={prepareOffline}><span><strong>Prepare for Offline Use</strong><small>{offlineStatus}</small></span><span aria-hidden="true">&gt;</span></button>
-            <button className="settings-row" onClick={handleSync}><span><strong>Sync Saved Work</strong><small>{records.filter((record) => !record.syncedAt).length} records waiting to sync.</small></span><span aria-hidden="true">&gt;</span></button>
-            <button className="settings-row" onClick={checkDevice}><span><strong>Device Check</strong><small>{deviceStatus}</small></span><span aria-hidden="true">&gt;</span></button>
+            <button className="settings-row" onClick={prepareOffline}><span><strong>Prepare for Offline Use</strong><small>{offlineStatus}</small></span><span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span></button>
+            <button className="settings-row" onClick={handleSync}><span><strong>Sync Saved Work</strong><small>{records.filter((record) => !record.syncedAt).length} records waiting to sync.</small></span><span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span></button>
+            <button className="settings-row" onClick={checkDevice}><span><strong>Device Check</strong><small>{deviceStatus}</small></span><span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span></button>
             <article className="panel-card offline-checklist"><p className="eyebrow">Offline Setup</p><ol><li>Open this HTTPS app while connected.</li><li>Tap Prepare for Offline Use.</li><li>Add the app to the home screen.</li><li>Reopen in airplane mode and run one trial.</li></ol></article>
             {!isTeacherPreview && (
               <article className="panel-card teacher-tools">
@@ -1034,7 +1034,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
                   <span className="student-avatar" aria-hidden="true">{section.name.trim().slice(0, 2).toUpperCase() || "SC"}</span>
                   <span><strong>{section.name}</strong><small>{section.studentCount} student{section.studentCount === 1 ? "" : "s"}</small></span>
                   <small aria-hidden="true" />
-                  <span aria-hidden="true">&gt;</span>
+                  <span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span>
                 </button>
               )) : <p className="muted">No sections yet. Create one above.</p>}
             </div>
@@ -1051,7 +1051,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
             <article className="panel-card">
               <button type="button" className="row-between disclosure-toggle" onClick={() => setShowAddStudent((current) => !current)} aria-expanded={showAddStudent}>
                 <span className="eyebrow">Add Student</span>
-                <span className={`disclosure-chevron ${showAddStudent ? "open" : ""}`} aria-hidden="true">&gt;</span>
+                <span className={`disclosure-chevron ${showAddStudent ? "open" : ""}`} aria-hidden="true"><ChevronRight size={18} strokeWidth={2.4} /></span>
               </button>
               {showAddStudent && (
                 <form className="auth-form compact-form" onSubmit={handleCreateSectionStudent}>
@@ -1078,7 +1078,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
                         aria-expanded={isExpanded}
                       >
                         <span><small>{student.username}</small><p>{student.name}</p></span>
-                        <span className={`disclosure-chevron ${isExpanded ? "open" : ""}`} aria-hidden="true">&gt;</span>
+                        <span className={`disclosure-chevron ${isExpanded ? "open" : ""}`} aria-hidden="true"><ChevronRight size={18} strokeWidth={2.4} /></span>
                       </button>
                       {isExpanded && (
                         <div className="student-progress-panel">
