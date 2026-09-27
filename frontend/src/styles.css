@@ -432,8 +432,24 @@ small {
   gap: 12px;
 }
 
+/* Screens are mounted one at a time (see App.tsx), so this plays on every navigation:
+   a short fade/rise-in makes switching screens feel considered instead of an instant swap. */
 .screen.active {
   display: grid;
+  animation: screen-enter 220ms ease both;
+}
+
+@keyframes screen-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen.active {
+    animation: none;
+  }
 }
 
 .panel-card,
