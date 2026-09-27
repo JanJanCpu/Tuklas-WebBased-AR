@@ -782,7 +782,8 @@ function Workspace({ user }: { user: AuthUser | null }) {
               {!selectedQuarter && [1, 2, 3, 4].map(quarter => {
                 const items = visibleModules.filter(item => item.quarterNumber === quarter);
                 if (!items.length) return null;
-                return <button className="module-card" key={quarter} onClick={() => setSelectedQuarter(quarter)}><span className="module-icon">Q{quarter}</span><span><strong>{items[0].quarter}</strong><small>{new Set(items.map(i => i.groupId)).size} module(s), {items.length} experiments</small></span><span aria-hidden="true">&gt;</span></button>;
+                const moduleCount = new Set(items.map(i => i.groupId)).size;
+                return <button className="module-card" key={quarter} onClick={() => setSelectedQuarter(quarter)}><span className="module-icon">Q{quarter}</span><span><strong>{items[0].quarter}</strong><small>{moduleCount} module{moduleCount === 1 ? "" : "s"}, {items.length} experiment{items.length === 1 ? "" : "s"}</small></span><span aria-hidden="true">&gt;</span></button>;
               })}
               {selectedQuarter && !selectedGroup && [...new Set(visibleModules.filter(item => item.quarterNumber === selectedQuarter).map(item => item.groupId))].map(group => {
                 const items = visibleModules.filter(item => item.groupId === group);
