@@ -52,8 +52,9 @@ const moduleIcons: Record<string, LucideIcon> = {
 };
 
 function ModuleIcon({ moduleId }: { moduleId: string }) {
-  const Icon = moduleIcons[fallbackModules.find(item => item.id === moduleId)?.groupId || moduleId] || Activity;
-  return <span className="module-icon" aria-hidden="true"><Icon size={24} strokeWidth={2.2} /></span>;
+  const groupId = fallbackModules.find(item => item.id === moduleId)?.groupId || moduleId;
+  const Icon = moduleIcons[groupId] || Activity;
+  return <span className={`module-icon subject-${groupId}`} aria-hidden="true"><Icon size={24} strokeWidth={2.2} /></span>;
 }
 
 function App() {
@@ -772,9 +773,9 @@ function Workspace({ user }: { user: AuthUser | null }) {
         {screen === "modules" && (
           <section className="screen active">
             <nav className="curriculum-breadcrumb" aria-label="Curriculum navigation">
-              <button onClick={() => { setSelectedQuarter(null); setSelectedGroup(null); }}>Quarters</button>
-              {selectedQuarter !== null && <><span> / </span><button onClick={() => setSelectedGroup(null)}>Quarter {selectedQuarter}</button></>}
-              {selectedGroup && <><span> / </span><span>{modules.find(m => m.groupId === selectedGroup)?.moduleTitle}</span></>}
+              <button className={selectedQuarter === null ? "current" : ""} onClick={() => { setSelectedQuarter(null); setSelectedGroup(null); }}>Quarters</button>
+              {selectedQuarter !== null && <><ChevronRight size={14} strokeWidth={2.4} aria-hidden="true" /><button className={!selectedGroup ? "current" : ""} onClick={() => setSelectedGroup(null)}>Quarter {selectedQuarter}</button></>}
+              {selectedGroup && <><ChevronRight size={14} strokeWidth={2.4} aria-hidden="true" /><span className="current">{modules.find(m => m.groupId === selectedGroup)?.moduleTitle}</span></>}
             </nav>
             <label className="search-box"><span>Search experiments</span><input type="search" placeholder="Search topics or experiments..." value={query} onChange={event => setQuery(event.target.value)} /></label>
             <h2>{selectedGroup ? "Experiments" : selectedQuarter ? "Modules" : "Quarters"}</h2>

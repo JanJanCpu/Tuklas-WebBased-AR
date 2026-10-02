@@ -548,6 +548,18 @@ small {
   background: #eaf2ff;
 }
 
+/* One accent per MATATAG subject strand, so a student can tell Physics from Chemistry at a
+   glance across Home, the module list, and search results, instead of every icon badge being
+   the same blue regardless of subject. Chosen to extend the brand palette, not fight it: Physics
+   keeps the house blue since it's the default/most frequent strand, Materials reuses the brand
+   red (chemistry/reaction association), the other three are new but kept in the same muted,
+   slightly desaturated family as navy/red/gold rather than picked as a bright rainbow set. */
+.subject-motion { border-color: rgba(15, 76, 154, 0.22); color: var(--blue); background: #eaf2ff; }
+.subject-electricity { border-color: rgba(14, 143, 138, 0.28); color: #0e8f8a; background: #e4f6f5; }
+.subject-earth-space { border-color: rgba(181, 103, 26, 0.3); color: #b5671a; background: #fbeee0; }
+.subject-life { border-color: rgba(43, 138, 78, 0.28); color: #2b8a4e; background: #e6f6ec; }
+.subject-materials { border-color: rgba(215, 25, 32, 0.24); color: var(--red); background: #fdecec; }
+
 .marker-panel {
   display: grid;
   grid-template-columns: 1fr 112px;
@@ -950,8 +962,12 @@ input[type="range"] {
   pointer-events: none;
 }
 
-.curriculum-breadcrumb { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 16px; }
-.curriculum-breadcrumb button { border: 0; background: transparent; color: var(--blue); padding: 8px 0; text-decoration: underline; }
+.curriculum-breadcrumb { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 16px; color: var(--muted); }
+.curriculum-breadcrumb button { border: 0; background: transparent; padding: 6px 2px; color: var(--muted); font-weight: 700; cursor: pointer; }
+.curriculum-breadcrumb button:hover { color: var(--blue); }
+.curriculum-breadcrumb .current,
+.curriculum-breadcrumb button.current { color: var(--ink); font-weight: 800; cursor: default; }
+.curriculum-breadcrumb svg { flex-shrink: 0; color: var(--line); }
 .module-card > span { min-width: 0; }
 .module-card strong, .module-card small { overflow-wrap: anywhere; }
 .bond-workbench, .dna-workbench, .earth-workbench { margin: 16px 0; }
