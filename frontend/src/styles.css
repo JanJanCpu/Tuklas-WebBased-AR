@@ -24,8 +24,12 @@
   --surface: #f5f8fd;
   --panel: #ffffff;
   /* A quieter resting shadow so the one elevated "hero" surface per screen (see .overall-progress)
-     actually reads as heavier than everything around it, instead of every card shouting equally. */
-  --shadow: 0 6px 16px rgba(15, 76, 154, 0.08);
+     actually reads as heavier than everything around it, instead of every card shouting equally.
+     Strong enough on its own to read as an edge against --surface without a visible border line -
+     on a washed-out budget-phone screen in daylight, a shadow this faint plus zero border would
+     make cards disappear, so this is deliberately not as faint as a desktop-only app could get
+     away with. */
+  --shadow: 0 8px 20px rgba(15, 76, 154, 0.1);
   --camera: #27344d;
   /* A softer, friendlier corner radius for cards, buttons and other main surfaces.
      Small functional chips (badges, dots, pills) keep their own tighter radius. */
@@ -244,7 +248,7 @@ small {
 .primary-button {
   border: 0;
   color: #fff;
-  background: var(--blue);
+  background: linear-gradient(135deg, var(--blue) 0%, var(--blue-dark) 100%);
   box-shadow: 0 10px 22px rgba(15, 76, 154, 0.32);
 }
 
@@ -476,12 +480,12 @@ small {
 .screen-stack {
   width: min(760px, 100%);
   margin: 0 auto;
-  padding: 12px;
+  padding: 14px;
 }
 
 .screen {
   display: none;
-  gap: 12px;
+  gap: 16px;
 }
 
 /* Screens are mounted one at a time (see App.tsx), so this plays on every navigation:
@@ -504,6 +508,9 @@ small {
   }
 }
 
+/* Edges are drawn with shadow alone, not a visible 1px border - a bordered card reads as an
+   older "boxed form" style; letting the shadow do the edge work is the more current look
+   (Linear/Notion/Stripe-era cards) and it's one fewer hard line fighting the soft shadow. */
 .panel-card,
 .hero-card,
 .task-card,
@@ -512,7 +519,7 @@ small {
 .ar-panel,
 .result-card,
 .record-card {
-  border: 1px solid var(--line);
+  border: 1px solid rgba(15, 76, 154, 0.05);
   border-radius: var(--radius);
   background: var(--panel);
   box-shadow: var(--shadow);
@@ -523,7 +530,7 @@ small {
 .panel-card,
 .ar-panel,
 .result-card {
-  padding: 14px;
+  padding: 16px;
 }
 
 .hero-card {
@@ -607,7 +614,7 @@ small {
   width: 0%;
   height: 100%;
   border-radius: inherit;
-  background: var(--blue);
+  background: linear-gradient(90deg, var(--blue) 0%, #2f7fd8 100%);
   transition: width 180ms ease;
 }
 
