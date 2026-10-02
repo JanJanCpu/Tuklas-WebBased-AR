@@ -700,7 +700,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
               <>
                 <article className="panel-card overall-progress">
                   <div className="row-between">
-                    <div><p className="eyebrow">My Class</p><h2>Class Progress</h2></div>
+                    <h2>Class Progress</h2>
                     <strong className="overall-percent">{students.length}</strong>
                   </div>
                   <p>{students.length} student account{students.length === 1 ? "" : "s"} - {classRecords.length} submission{classRecords.length === 1 ? "" : "s"} synced</p>
@@ -758,7 +758,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
             )}
             <article className="panel-card marker-access">
               <div className="marker-access-copy">
-                <div><p className="eyebrow">AR Marker</p><h2>Printable and downloadable marker</h2><p>Open the marker for printing or download a copy for offline classroom use.</p></div>
+                <div><h2>Printable and downloadable marker</h2><p>Open the marker for printing or download a copy for offline classroom use.</p></div>
                 <a className="marker-preview" href="/assets/tuklas-marker.png" target="_blank" rel="noreferrer" aria-label="Open printable Tuklas AR marker"><span>TUKLAS</span></a>
               </div>
               <div className="marker-actions">

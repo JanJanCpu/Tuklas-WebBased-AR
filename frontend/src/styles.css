@@ -1,3 +1,17 @@
+/* Self-hosted so it precaches with the rest of the app shell - no network request at runtime.
+   Subsetted to the Latin letters/digits/punctuation this app actually renders, so it's ~20KB,
+   not the 100KB+ a full Google Fonts weight normally costs. Lexend only: a reading-proficiency
+   typeface, actually designed for this audience rather than picked for looks. Used sparingly -
+   see "one bold display font, used in one place" below, not on every heading. */
+@font-face {
+  font-family: "Lexend";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("/fonts/lexend-800.woff2") format("woff2");
+  unicode-range: U+25, U+27, U+2C-39, U+41-5A, U+61-7A;
+}
+
 :root {
   color-scheme: light;
   --blue: #0f4c9a;
@@ -9,11 +23,14 @@
   --line: #ccd8ea;
   --surface: #f5f8fd;
   --panel: #ffffff;
-  --shadow: 0 12px 28px rgba(15, 76, 154, 0.12);
+  /* A quieter resting shadow so the one elevated "hero" surface per screen (see .overall-progress)
+     actually reads as heavier than everything around it, instead of every card shouting equally. */
+  --shadow: 0 6px 16px rgba(15, 76, 154, 0.08);
   --camera: #27344d;
   /* A softer, friendlier corner radius for cards, buttons and other main surfaces.
      Small functional chips (badges, dots, pills) keep their own tighter radius. */
   --radius: 14px;
+  --font-display: "Lexend", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 * {
@@ -79,8 +96,11 @@ p {
 
 h1 {
   margin-bottom: 0;
+  font-family: var(--font-display);
   font-size: 1.25rem;
+  font-weight: 800;
   line-height: 1.1;
+  letter-spacing: -0.01em;
 }
 
 h2 {
@@ -579,14 +599,28 @@ small {
   transition: width 180ms ease;
 }
 
+/* The one card on Home that gets more visual weight than everything around it -
+   a heavier shadow and a gold top edge, the same treatment every other card deliberately
+   does not get, so the eye lands here first instead of every surface competing equally. */
 .overall-progress {
   display: grid;
   gap: 10px;
+  border-top: 5px solid var(--gold);
+  box-shadow: 0 18px 40px rgba(15, 76, 154, 0.22);
 }
 
 .overall-percent {
   color: var(--blue);
   font-size: 1.7rem;
+}
+
+/* Only the Home hero stat gets the display typeface and the larger, bolder treatment -
+   the same number reused for a feedback score elsewhere stays at the quieter default. */
+.overall-progress .overall-percent {
+  font-family: var(--font-display);
+  font-size: 2.3rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .overall-track {
