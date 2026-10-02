@@ -1029,6 +1029,27 @@ input[type="range"] {
 .ar-panel .row-between { flex-wrap: wrap; }
 .ar-panel .row-between > div { flex: 1 1 180px; min-width: 0; }
 
+/* Keeps the camera view (and whether it's still looking for the marker) on screen while a
+   student scrolls down to read the prompt, adjust sliders, or hit Run Trial - all of which sit
+   below this in the same card. --header-h is measured in JS (see the ResizeObserver effect in
+   App.tsx) rather than a guessed constant, since the header's own height changes when a longer
+   module title wraps to two lines.
+   Capped at 420px wide (not just 100%) so this doesn't balloon into a huge pinned block on a
+   tablet-width screen, where .screen-stack is up to 760px and a 4:3 frame at that width would
+   eat most of the viewport every time it's stuck. */
+.ar-frame-sticky {
+  position: sticky;
+  top: calc(var(--header-h, 140px) + 10px);
+  z-index: 10;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 10px;
+  border: 1px solid rgba(15, 76, 154, 0.05);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
 .cart {
   position: absolute;
   left: 46px;

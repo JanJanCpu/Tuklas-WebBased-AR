@@ -66,6 +66,7 @@ function App() {
 function Workspace({ user }: { user: AuthUser | null }) {
   const recordSession = useRef<ReturnType<typeof createRecordSession> | null>(null);
   const pendingSaves = useRef(new Set<string>());
+  const headerRef = useRef<HTMLElement | null>(null);
   const role: Role | "" = user?.role ?? "";
   const isTeacherPreview = role === "teacher";
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
@@ -175,6 +176,20 @@ function Workspace({ user }: { user: AuthUser | null }) {
   useEffect(() => {
     fetchModules().then(items => { if (items.length === fallbackModules.length && items.every(item => item.groupId && fallbackModules.some(local => local.id === item.id))) setModules(items); }).catch(() => undefined);
   }, []);
+
+  // The sticky AR camera preview (see .ar-frame-sticky) docks just below the header, but the
+  // header's own height isn't constant - the title wraps to two lines on some screens - so a
+  // fixed CSS offset would either leave a gap or let the header cover the camera. Measure it
+  // for real and keep it current on resize/orientation change/title changes instead of guessing.
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const update = () => document.documentElement.style.setProperty("--header-h", `${header.offsetHeight}px`);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, [screen]);
 
   useEffect(() => {
     if (!user) return;
@@ -683,7 +698,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
 
   return (
     <div className={`${role}-mode`}>
-      <header className="app-header">
+      <header className="app-header" ref={headerRef}>
         <button className={`back-button ${(history.length > 0 || selectedQuarter !== null) && screen !== "home" ? "visible" : ""}`} onClick={goBack} aria-label="Go back"><ChevronLeft size={20} strokeWidth={2.6} /></button>
         <div>
           <p className="eyebrow">{titles[screen][0]}</p>
@@ -868,18 +883,20 @@ function Workspace({ user }: { user: AuthUser | null }) {
                 <div><p className="eyebrow">{viewMode === "ar" ? "Camera Mode" : "3D Model Mode"}</p><h2>{viewMode === "ar" ? "Start the camera and observe the trial" : "Use the model when camera access is unavailable"}</h2></div>
                 <button className="text-button compact-button" onClick={() => setViewMode(viewMode === "ar" ? "fallback" : "ar")}>{viewMode === "ar" ? "Use 3D Model" : "Use Camera"}</button>
               </div>
+            </article>
+            {/* A sibling of .ar-panel, not nested inside it: position: sticky only stays pinned
+                while scrolling through its own parent's height, and .ar-panel (just the heading
+                row) is too short to span the long Observation Prompt card below. As a direct
+                child of .screen, its containing block is this whole route's content instead. */}
+            <div className="ar-frame-sticky">
               <div className={`ar-frame ${viewMode === "fallback" ? "fallback-mode" : ""}`}>
                 <span className="scan-corner tl" aria-hidden="true" /><span className="scan-corner tr" aria-hidden="true" /><span className="scan-corner bl" aria-hidden="true" /><span className="scan-corner br" aria-hidden="true" />
                 <Suspense fallback={null}>
                   <ScienceScene moduleId={activeModule.id} controlA={controlA} controlB={controlB} lab={lab} trialPulse={trialPulse} viewMode={viewMode} onArReady={setCameraReady} onArStatus={setCameraStatus} onMarkerChange={setMarkerDetected} onControlChange={(which, value) => (which === "a" ? setControlA(value) : setControlB(value))} onLabChange={patch => setLab(current => ({ ...current, ...patch }))} />
                 </Suspense>
               </div>
-              {viewMode === "ar" && (
-                <>
-                  <p className="camera-status">{cameraStatus}</p>
-                </>
-              )}
-            </article>
+              {viewMode === "ar" && <p className="camera-status">{cameraStatus}</p>}
+            </div>
             <article className="panel-card">
               <p className="eyebrow">Observation Prompt</p>
               <p>{activeModule.observe}</p>
