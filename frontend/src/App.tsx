@@ -8,7 +8,7 @@ import { getObservationModel, getObservationDefaults, formatControlValue, initia
 import { ExperimentControls } from "./components/ExperimentControls";
 import { AccountDetails } from "./components/AccountDetails";
 import type { ActivityRecord, AuthUser, ClassProgressRecord, Feedback, LearningModule, Role, Screen, Section, SectionSummary, Stage, ViewMode } from "./types/domain";
-import { Activity, BookOpen, ChevronLeft, ChevronRight, CircuitBoard, Download, Earth, Eye, Home, Microscope, Printer, Settings, Thermometer, Users, type LucideIcon } from "lucide-react";
+import { Activity, BookOpen, ChevronLeft, ChevronRight, CircuitBoard, Download, Earth, Eye, Home, Microscope, Printer, ScanLine, Settings, Thermometer, Users, type LucideIcon } from "lucide-react";
 
 // three.js (pulled in by ScienceScene) is a heavy dependency that only the
 // Observe screen and its fallback 3D preview need - lazy-loading it keeps
@@ -605,6 +605,8 @@ function Workspace({ user }: { user: AuthUser | null }) {
     return (
       <main className="landing-screen" aria-labelledby="landingTitle">
         <section className="landing-hero">
+          <span className="scan-corner tl" aria-hidden="true" /><span className="scan-corner tr" aria-hidden="true" /><span className="scan-corner bl" aria-hidden="true" /><span className="scan-corner br" aria-hidden="true" />
+          <span className="hero-scan-icon" aria-hidden="true"><ScanLine size={18} strokeWidth={2.2} /></span>
           <p className="eyebrow">Grade 9 WebAR Science Learning</p>
           <h1 id="landingTitle">Tuklas AR Science Lab</h1>
           <p>Predict, observe, and explain science concepts using camera-based classroom activities and offline-ready learning records.</p>
@@ -867,6 +869,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
                 <button className="text-button compact-button" onClick={() => setViewMode(viewMode === "ar" ? "fallback" : "ar")}>{viewMode === "ar" ? "Use 3D Model" : "Use Camera"}</button>
               </div>
               <div className={`ar-frame ${viewMode === "fallback" ? "fallback-mode" : ""}`}>
+                <span className="scan-corner tl" aria-hidden="true" /><span className="scan-corner tr" aria-hidden="true" /><span className="scan-corner bl" aria-hidden="true" /><span className="scan-corner br" aria-hidden="true" />
                 <Suspense fallback={null}>
                   <ScienceScene moduleId={activeModule.id} controlA={controlA} controlB={controlB} lab={lab} trialPulse={trialPulse} viewMode={viewMode} onArReady={setCameraReady} onArStatus={setCameraStatus} onMarkerChange={setMarkerDetected} onControlChange={(which, value) => (which === "a" ? setControlA(value) : setControlB(value))} onLabChange={patch => setLab(current => ({ ...current, ...patch }))} />
                 </Suspense>

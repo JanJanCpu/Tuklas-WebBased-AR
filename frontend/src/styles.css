@@ -150,13 +150,45 @@ small {
 }
 
 .landing-hero {
+  position: relative;
   align-self: end;
-  padding: 28px 22px;
+  padding: 36px 26px;
   border: 1px solid rgba(255, 255, 255, 0.42);
   color: #fff;
   text-align: left;
   background: rgba(7, 31, 68, 0.9);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.32);
+}
+
+/* AR-viewfinder corner brackets: the one thing this app's UI never actually said "this is a
+   camera/AR tool" with. Reused on .ar-frame (the real camera view) so the same visual language
+   that introduces the app on login is the language the app actually uses once you're in it,
+   instead of two unrelated design systems. Four real elements, not a border trick, so they stay
+   crisp at any corner radius. */
+.scan-corner {
+  position: absolute;
+  z-index: 5;
+  width: 22px;
+  height: 22px;
+  pointer-events: none;
+}
+
+.scan-corner.tl { top: 10px; left: 10px; border-top: 3px solid var(--gold); border-left: 3px solid var(--gold); border-radius: 6px 0 0 0; }
+.scan-corner.tr { top: 10px; right: 10px; border-top: 3px solid var(--gold); border-right: 3px solid var(--gold); border-radius: 0 6px 0 0; }
+.scan-corner.bl { bottom: 10px; left: 10px; border-bottom: 3px solid var(--gold); border-left: 3px solid var(--gold); border-radius: 0 0 0 6px; }
+.scan-corner.br { bottom: 10px; right: 10px; border-bottom: 3px solid var(--gold); border-right: 3px solid var(--gold); border-radius: 0 0 6px 0; }
+
+.hero-scan-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-bottom: 10px;
+  border: 1.5px solid rgba(247, 198, 0, 0.5);
+  border-radius: 50%;
+  color: var(--gold);
+  background: rgba(247, 198, 0, 0.1);
 }
 
 .landing-hero p {
