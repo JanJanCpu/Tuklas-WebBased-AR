@@ -771,8 +771,16 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     mantleFade.material.map = fadeTexture; mantleFade.material.transparent = true; mantleFade.material.depthWrite = false;
     label("Left: what it is made of · Right: how it behaves", 0, -2.68, 5.2, detail, 12);
     label("Tap a layer to select it", 0, -3.05, 3.2, detail, 10);
-    // A small copy of the same globe (shared geometry and materials) shows where the magnified slab comes from.
-    const mini = new THREE.Group(); mini.scale.setScalar(0.2); mini.position.set(2.4, 1.6, 0.3); mini.rotation.x = 0.32; root.add(mini);
+    // A small copy of the same globe (shared geometry and materials) shows where the magnified
+    // slab comes from. Sat well above and right of the slab's own brackets/labels - those labels
+    // (e.g. "Lithosphere") are wide text sprites that reach past x=2.5, and the mini globe used to
+    // sit right on top of them with no backing of its own, reading as a loose sticker rather than
+    // a grounded part of the scene. A simple two-circle "badge" (a darker ring behind a light
+    // fill, the cheapest way to fake a bordered card with flat 3D geometry) gives it a home.
+    const miniX = 3.3, miniY = 1.65;
+    const badgeRing = mesh(new THREE.CircleGeometry(0.62, 32), 0xaec4e0, miniX, miniY, -0.2, root, { roughness: 1 });
+    const badgeFill = mesh(new THREE.CircleGeometry(0.56, 32), 0xf5f8fc, miniX, miniY, -0.15, root, { roughness: 1 });
+    const mini = new THREE.Group(); mini.scale.setScalar(0.2); mini.position.set(miniX, miniY, 0.3); mini.rotation.x = 0.32; root.add(mini);
     globe.children.forEach(child => mini.add(child.clone()));
     mini.children.forEach((child, k) => {
       if (k < 6) child.visible = buildOrder.includes(k);
@@ -781,8 +789,8 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       if ((child as THREE.Mesh).isMesh) registry.push(child as THREE.Mesh);
     });
     mesh(new THREE.SphereGeometry(0.16, 10, 8), 0xff4d4d, 0, R, 0, mini, { emissive: 0xff2222, emissiveIntensity: 0.9 });
-    const zoomLine = line([[2.36, 1.9, 0.3], [1.1, 1.5, 0.3]], 0xff4d4d);
-    const zoomLabel = label("Zoomed in here", 2.4, 1.18, 1.4, root, 5);
+    const zoomLine = line([[miniX - 0.5, miniY - 0.15, 0.3], [0.75, 1.8, 0.3]], 0xff4d4d);
+    const zoomLabel = label("Zoomed in here", miniX, miniY - 1.3, 1.4, root, 5);
     interact = {
       targets: { crust: blocks[0], upper: blocks[1], soft: blocks[2], chip0: chips[0], chip1: chips[1], chip2: chips[2], chip3: chips[3] },
       down: (name, point) => { if (name.startsWith("chip")) { heldChip.index = Number(name.slice(4)); heldChip.x = point.x; heldChip.y = point.y; } },
@@ -796,7 +804,7 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     updates.push((time, a, b, lab) => {
       globe.visible = !a; detail.visible = Boolean(a);
       textures[2].offset.x = (time * 0.05) % 1;
-      mini.visible = Boolean(a); zoomLine.visible = Boolean(a); zoomLabel.sprite.visible = Boolean(a); mini.rotation.y = Math.sin(time * 0.45) * 0.28;
+      mini.visible = Boolean(a); zoomLine.visible = Boolean(a); zoomLabel.sprite.visible = Boolean(a); badgeRing.visible = Boolean(a); badgeFill.visible = Boolean(a); mini.rotation.y = Math.sin(time * 0.45) * 0.28;
       sceneTime = time;
       chips.forEach((chip, order) => {
         chip.visible = !a && order >= lab.layers;
