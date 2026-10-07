@@ -5,7 +5,6 @@ import type { ViewMode } from "../types/domain";
 import { createExperimentScene, type InteractionApi } from "./experimentScene";
 import { controls, type LabState } from "../lib/experiments";
 import { loadArToolkit } from "../lib/arjs";
-import { createHandTracker, type HandSample, type HandTracker } from "../lib/handTracking";
 
 interface ScienceSceneProps {
   moduleId: string;
@@ -25,8 +24,6 @@ interface ScienceSceneProps {
 
 const cameraParametersUrl = "/assets/camera_para.dat";
 const tuklasMarkerUrl = "/assets/tuklas-marker.patt";
-const HAND_INTERVAL_MS = 66;
-const HAND_SEARCH_INTERVAL_MS = 250;
 
 export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, viewMode, onArReady, onArStatus, onMarkerChange, onControlChange, onLabChange }: ScienceSceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -227,82 +224,37 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
       });
     }
 
-    // Hand-tracking spike: enabled with ?hands=1, AR mode only.
-    const handsEnabled = viewMode === "ar" && new URLSearchParams(window.location.search).has("hands");
     const fpsEnabled = new URLSearchParams(window.location.search).has("fps");
-    let handTracker: HandTracker | null = null;
-    let handVideo: HTMLVideoElement | null = null;
-    let handHud: HTMLDivElement | null = null;
-    let handDot: HTMLDivElement | null = null;
-    let handText: HTMLDivElement | null = null;
-    let handState = "loading hand model...";
-    let lastDetectAt = 0;
+    let fpsHud: HTMLDivElement | null = null;
+    let fpsText: HTMLDivElement | null = null;
     let statsAt = performance.now();
     let frames = 0;
-    let detects = 0;
     let renderFps = 0;
-    let detectFps = 0;
-    let detectMs = 0;
-    let handPresent = false;
 
-    const showHandSample = (sample: HandSample | null) => {
-      handPresent = sample !== null;
-      if (!handDot) return;
-      if (!sample) { handDot.style.display = "none"; handState = "no hand"; return; }
-      handDot.style.display = "block";
-      handDot.style.left = `${sample.x * 100}%`;
-      handDot.style.top = `${sample.y * 100}%`;
-      handDot.style.background = sample.pinching ? "#22c55e" : "#ffffff";
-      handState = `${sample.pinching ? "GRAB" : "open"} (pinch ${sample.pinchRatio.toFixed(2)})`;
-    };
-
-    const tickHands = (now: number) => {
+    const tickFps = (now: number) => {
       frames += 1;
-      // Keep detection to roughly a third of frame time; search for a hand less often than we track one.
-      const interval = handPresent ? Math.max(HAND_INTERVAL_MS, detectMs * 2) : Math.max(HAND_SEARCH_INTERVAL_MS, detectMs * 3);
-      if (handTracker && handVideo && handVideo.readyState >= 2 && now - lastDetectAt >= interval) {
-        lastDetectAt = now;
-        const sample = handTracker.detect(handVideo, now);
-        if (sample !== undefined) {
-          detects += 1;
-          detectMs = detectMs * 0.8 + (performance.now() - now) * 0.2;
-          showHandSample(sample);
-        }
-      }
       if (now - statsAt >= 1000) {
         renderFps = Math.round(frames * 1000 / (now - statsAt));
-        detectFps = Math.round(detects * 1000 / (now - statsAt));
-        frames = 0; detects = 0; statsAt = now;
-        if (handText) handText.textContent = `render ${renderFps} fps | hands ${detectFps} fps | ${Math.round(detectMs)} ms ${handTracker?.delegate ?? ""} | ${handState} | q${quality} d${detectEvery} t${trackingSize.w}${emptyScene ? " empty" : ""} | b27`;
+        frames = 0; statsAt = now;
+        if (fpsText) fpsText.textContent = `render ${renderFps} fps | q${quality} d${detectEvery} t${trackingSize.w}${emptyScene ? " empty" : ""} | b28`;
       }
     };
 
-    function startHands(video: HTMLVideoElement | null) {
-      handVideo = video;
-      handHud = document.createElement("div");
-      handHud.style.cssText = "position:absolute;inset:0;z-index:5;pointer-events:none;";
-      handDot = document.createElement("div");
-      handDot.style.cssText = "position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;border:3px solid #0f4c9a;display:none;";
-      handText = document.createElement("div");
-      handText.style.cssText = "position:absolute;left:8px;top:8px;padding:4px 8px;border-radius:6px;background:rgba(0,0,0,.65);color:#fff;font:12px/1.3 monospace;";
-      handText.textContent = handState;
-      handHud.append(handDot, handText);
-      mount!.appendChild(handHud);
-      if (!handsEnabled) { handState = "fps only"; return; }
-      const preferred = new URLSearchParams(window.location.search).get("hands")?.toLowerCase() === "cpu" ? "CPU" : "GPU";
-      createHandTracker(preferred).then(tracker => {
-        if (cancelled) { tracker.close(); return; }
-        handTracker = tracker;
-        handState = "no hand";
-      }).catch(() => { handState = "hand model failed to load"; });
+    function startFpsHud() {
+      fpsHud = document.createElement("div");
+      fpsHud.style.cssText = "position:absolute;inset:0;z-index:5;pointer-events:none;";
+      fpsText = document.createElement("div");
+      fpsText.style.cssText = "position:absolute;left:8px;top:8px;padding:4px 8px;border-radius:6px;background:rgba(0,0,0,.65);color:#fff;font:12px/1.3 monospace;";
+      fpsHud.append(fpsText);
+      mount!.appendChild(fpsHud);
     }
 
-    if (fpsEnabled && viewMode === "fallback") startHands(null);
+    if (fpsEnabled && viewMode === "fallback") startFpsHud();
 
     const render = () => {
       const now = performance.now();
       watchFrameRate(now);
-      if (handsEnabled || fpsEnabled) tickHands(now);
+      if (fpsEnabled) tickFps(now);
       const current = valuesRef.current;
       const inputs = JSON.stringify(current);
       if (inputs !== previousInputs) { elapsed = 0; previousInputs = inputs; }
@@ -430,7 +382,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
               void video.play().catch(() => {
                 if (!cancelled) onArStatus?.("Camera playback paused. Switch to 3D and reopen the camera.");
               });
-              if (handsEnabled || fpsEnabled) startHands(video);
+              if (fpsEnabled) startFpsHud();
               context.init(() => {
                 if (cancelled) { context.dispose?.(); return; }
                 const controller = context.arController!;
@@ -496,8 +448,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
       resizeObserver.disconnect();
       onMarkerChange?.(false);
       inputCleanup.forEach(remove => remove());
-      handTracker?.close();
-      handHud?.remove();
+      fpsHud?.remove();
       stopCamera();
       if (arContext?.arController) {
         const context = arContext;

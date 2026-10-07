@@ -12,13 +12,12 @@ Capstone: "Development of an Offline Augmented Reality Science Laboratory Simula
 
 This is **pre-defense**, in a dedicated polish window before the panel and before school testing:
 1. Thesis audit against the code, research instruments, and Chapter 4/5 drafted from real data only are done. Never fabricate results, scores or logs; every number in the thesis comes from the real pilot data.
-2. **Now (through the polish window):** the adviser/panel wants the AR more dynamic ("Pokemon GO level", less flat and static, replacing physical lab objects, hand/touch manipulation) and the general app UI polished, before the upgraded build is used for real SOP1/2/3 testing at Antonio A. Maceda Integrated School (letters 1/2/6 are for arranging that testing) and before the October defense. All of this lives on the fork branch `feature/dynamic-ar`. Latest build label: **b27**.
+2. **Now (through the polish window):** the adviser/panel wants the AR more dynamic ("Pokemon GO level", less flat and static, replacing physical lab objects, hand/touch manipulation) and the general app UI polished, before the upgraded build is used for real SOP1/2/3 testing at Antonio A. Maceda Integrated School (letters 1/2/6 are for arranging that testing) and before the October defense. All of this lives on the fork branch `feature/dynamic-ar`. Latest build label: **b28**.
 3. **After school testing, before the defense:** the real data from that testing (curriculum validation, pretest/posttest, SUS) needs to go into Chapter 4/5 and the appendices, replacing/extending whatever pilot data is there now.
 
 Open items:
 - Phone test of Redmi A3 with `?fps=1&q=2` (expect readout `q2 d2 t320`): does 320x240 tracking reach 24+ fps with a steady marker?
 - Is the Earth (2.2) mini-globe legible on a phone? Do the circuit gestures feel right?
-- Decide the fate of the 31 MB `frontend/public/mediapipe/` hand-tracking files (drop them if hand mode is abandoned).
 - Permanent CORS wildcard for `tuklas-web-based-ar-frontend-*-tuklasar.vercel.app` was offered, not applied (would need code, since the allowlist is exact-match).
 - Optional: open-source 3D models; a PR back to the friend's repo once devices are re-tested.
 - If the upgraded build is reported in the thesis or paper, re-measure Redmi A3 / Poco C65 (see the fps table below).
@@ -99,7 +98,7 @@ Records are written locally first (`frontend/src/lib/storage.ts`, IndexedDB with
 
 `frontend/public/service-worker.js` is **cache-first for known assets with an SPA fallback** (`isSpaRoute` applies only when the path is not in the asset list). The Vite plugin `offlineBundle` in `frontend/vite.config.ts` walks `dist` and injects the asset list; the cache is versioned `tuklas-webar-<hash>`, `prepare()` downloads missing assets, and the page can send a `CACHE_NOW` message. `frontend/src/main.tsx` reloads on the SW's `controllerchange` so an open tab picks up the new JS.
 
-Every app update re-downloads the whole precache. Files under `mediapipe/` are **excluded** from the precache list (they were 60 MB of the precache and caused stale phone builds because downloads never finished). If a phone shows an old build, clear site data or reinstall. Bump the cache name only when the caching strategy itself changes.
+Every app update re-downloads the whole precache. (The `mediapipe/` hand-tracking model files, once 60 MB of the precache and a cause of stale phone builds, are gone as of 2026-10-08 - see Hand tracking below.) If a phone shows an old build, clear site data or reinstall. Bump the cache name only when the caching strategy itself changes.
 
 ### Frontend structure
 
@@ -166,10 +165,10 @@ Three.js 0.164.1 + AR.js scene. Studio environment lighting + ACES tone mapping.
 Auto step-down when fps stays under 19, persisted in `localStorage` as `tuklas-quality-v2`:
 - 0 full; 1 marker detection every 2nd frame; 2 pixelRatio 1 + 320x240 tracking canvas (`trackingSize`, `trackingLow` state); 3 Lambert (cheaper) shading.
 
-URL parameters: `?fps=1` (HUD: `render N fps | hands N fps | N ms DELEGATE | state | qN dN tNNN[ empty] | bNN`), `?q=<0-3>` force a level, `?detect=<n>` detect every n frames, `?empty=1` empty scene (isolates tracking cost), `?hands=1|cpu` hand-tracking spike. The HUD build label (currently `b27`, a string in `ScienceScene.tsx`) is how you confirm a phone loaded the new build; bump it on every change you want to verify remotely.
+URL parameters: `?fps=1` (HUD: `render N fps | qN dN tNNN[ empty] | bNN`), `?q=<0-3>` force a level, `?detect=<n>` detect every n frames, `?empty=1` empty scene (isolates tracking cost). The HUD build label (currently `b28`, a string in `ScienceScene.tsx`) is how you confirm a phone loaded the new build; bump it on every change you want to verify remotely.
 
-### Hand tracking (experimental, probably to be dropped)
-`lib/handTracking.ts` wraps MediaPipe Hand Landmarker (lazy import, GPU then CPU fallback, pinch hysteresis). Accurate but **not viable on budget phones**: Poco C65 GPU 5-10 fps render and 160-330 ms per detection; CPU worse (1-3 fps while tracking). Decision: touch manipulation is the main interaction; hand mode only for strong phones. Model files (~31 MB) live in `frontend/public/mediapipe/` and `@mediapipe/tasks-vision` is in `frontend/package.json`; excluded from the precache. Candidate for removal.
+### Hand tracking (removed, 2026-10-08)
+Was an experimental MediaPipe Hand Landmarker spike (`lib/handTracking.ts`, `?hands=1|cpu`), **not viable on budget phones**: Poco C65 GPU 5-10 fps render and 160-330 ms per detection; CPU worse (1-3 fps while tracking). Touch manipulation is the only interaction now. Removed `lib/handTracking.ts`, the 31 MB `frontend/public/mediapipe/` model files, and the `@mediapipe/tasks-vision` dependency; the fps HUD lost its `hands N fps | N ms DELEGATE | state` segment accordingly.
 
 ### Measured performance
 - Marker tracking (AR.js) is the frame-rate ceiling on weak phones, not rendering.
