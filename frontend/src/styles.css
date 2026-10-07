@@ -1041,6 +1041,16 @@ input[type="range"] {
   position: sticky;
   top: calc(var(--header-h, 140px) + 10px);
   z-index: 10;
+  /* width:100% is required here, not just max-width: .screen.active is a CSS grid, and a grid
+     item with margin-inline:auto but no explicit width gets Grid's "auto-margin alignment"
+     treatment instead of a normal block's stretch-then-cap - it shrinks to its own content's
+     max-content size (observed ~238px, nowhere near the 420px cap) instead of filling the
+     column and centering within it. The shrink was worse in 3D mode specifically, since that
+     mode renders one less child (no .camera-status line, only shown for viewMode "ar"), so the
+     content driving the shrink-wrap was even smaller - the frame and its canvas collapsed to a
+     few px and the 3D model effectively disappeared. Verified by measuring getBoundingClientRect
+     before/after adding width:100% in both modes. */
+  width: 100%;
   max-width: 420px;
   margin: 0 auto;
   padding: 10px;
