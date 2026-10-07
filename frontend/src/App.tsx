@@ -67,6 +67,13 @@ function Workspace({ user }: { user: AuthUser | null }) {
   const recordSession = useRef<ReturnType<typeof createRecordSession> | null>(null);
   const pendingSaves = useRef(new Set<string>());
   const headerRef = useRef<HTMLElement | null>(null);
+  // Module ids already seen as complete/graded, so the celebration only plays for a
+  // transition that happens live this session - never replayed for progress that was
+  // already there when records/feedback first loaded (resets on login/logout).
+  const seenCompleteRef = useRef(new Set<string>());
+  const completeHydratedRef = useRef(false);
+  const seenGradedRef = useRef(new Set<string>());
+  const gradedHydratedRef = useRef(false);
   const role: Role | "" = user?.role ?? "";
   const isTeacherPreview = role === "teacher";
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
@@ -97,6 +104,11 @@ function Workspace({ user }: { user: AuthUser | null }) {
   const [feedbackComment, setFeedbackComment] = useState("");
   const [feedbackFormError, setFeedbackFormError] = useState("");
   const [myFeedback, setMyFeedback] = useState<Feedback[]>([]);
+  // Module ids currently playing the "capture confirmed" completion celebration, and
+  // ids whose "Graded" badge should flash gold - both transient, cleared a moment after
+  // they start. See the effects below for how "just happened this session" is tracked.
+  const [justCompleted, setJustCompleted] = useState<Set<string>>(new Set());
+  const [justGraded, setJustGraded] = useState<Set<string>>(new Set());
   const [newSectionName, setNewSectionName] = useState("");
   const [sectionFormError, setSectionFormError] = useState("");
   const [screen, setScreen] = useState<Screen>("home");
@@ -206,6 +218,58 @@ function Workspace({ user }: { user: AuthUser | null }) {
     session.load().catch(() => showToast("Could not load saved work. Check browser storage."));
     return () => { session.stop(); recordSession.current = null; };
   }, [user?.id]);
+
+  // A fresh login (or logout) starts a new "session" for celebration purposes, so
+  // switching accounts never inherits stale completion/grade history as something new.
+  useEffect(() => {
+    seenCompleteRef.current = new Set();
+    completeHydratedRef.current = false;
+    seenGradedRef.current = new Set();
+    gradedHydratedRef.current = false;
+  }, [user?.id]);
+
+  // Plays the "capture confirmed" completion celebration the moment a module crosses
+  // into "all three stages done" - but only for a transition that happens live, never
+  // for progress that was already complete the first time records loaded this session.
+  useEffect(() => {
+    const completeIds = new Set(moduleProgress.filter((item) => item.completed === REQUIRED_STAGES.length).map((item) => item.module.id));
+    if (!completeHydratedRef.current) {
+      seenCompleteRef.current = completeIds;
+      completeHydratedRef.current = true;
+      return;
+    }
+    const newlyCompleted = [...completeIds].filter((id) => !seenCompleteRef.current.has(id));
+    if (!newlyCompleted.length) return;
+    seenCompleteRef.current = new Set([...seenCompleteRef.current, ...newlyCompleted]);
+    setJustCompleted((current) => new Set([...current, ...newlyCompleted]));
+    // One independent timer per id, not tied to this effect's own cleanup - a save or
+    // sync completing right after (another setRecords call, re-running this effect)
+    // must not cancel the clear-out for an id that already started celebrating.
+    newlyCompleted.forEach((id) => {
+      setTimeout(() => {
+        setJustCompleted((current) => { if (!current.has(id)) return current; const next = new Set(current); next.delete(id); return next; });
+      }, 1400);
+    });
+  }, [records]);
+
+  // Same idea for a grade just arriving - flashes the "Graded" badge gold once.
+  useEffect(() => {
+    const gradedIds = new Set(myFeedback.map((entry) => entry.moduleId));
+    if (!gradedHydratedRef.current) {
+      seenGradedRef.current = gradedIds;
+      gradedHydratedRef.current = true;
+      return;
+    }
+    const newlyGraded = [...gradedIds].filter((id) => !seenGradedRef.current.has(id));
+    if (!newlyGraded.length) return;
+    seenGradedRef.current = new Set([...seenGradedRef.current, ...newlyGraded]);
+    setJustGraded((current) => new Set([...current, ...newlyGraded]));
+    newlyGraded.forEach((id) => {
+      setTimeout(() => {
+        setJustGraded((current) => { if (!current.has(id)) return current; const next = new Set(current); next.delete(id); return next; });
+      }, 900);
+    });
+  }, [myFeedback]);
 
   // Keep resets and feedback live on every activity screen. Pulls and
   // uploads share a queue; saving locally never waits for the network.
@@ -682,16 +746,25 @@ function Workspace({ user }: { user: AuthUser | null }) {
     <section className="progress-category" aria-labelledby={`progress-${heading.toLowerCase().replace(/\s+/g, "-")}`}>
       <div className="row-between progress-category-heading"><h3 id={`progress-${heading.toLowerCase().replace(/\s+/g, "-")}`}>{heading}</h3><span>{items.length}</span></div>
       {items.length ? <div className="module-progress-list">
-        {items.map(({ module, completed, percent: modulePercent, stages, grade }) => (
-          <button type="button" className="module-progress-row" key={module.id} onClick={() => openModuleProgress(module, stages)}>
-            <ModuleIcon moduleId={module.id} />
-            <div>
-              <div className="row-between"><strong>{module.quarter}: {module.title}</strong><span>{modulePercent}%</span></div>
-              <div className="progress-track"><span style={{ width: `${modulePercent}%` }} /></div>
-              <div className="row-between"><small>{completed} of {REQUIRED_STAGES.length} stages</small>{grade && <small className="graded-badge">Graded{grade.score != null ? ` · ${grade.score}/100` : ""}</small>}</div>
-            </div>
-          </button>
-        ))}
+        {items.map(({ module, completed, percent: modulePercent, stages, grade }) => {
+          const capturing = justCompleted.has(module.id);
+          return (
+            <button type="button" className={`module-progress-row${capturing ? " row-capture-lock" : ""}`} key={module.id} onClick={() => openModuleProgress(module, stages)}>
+              {capturing && <>
+                <span className="row-lock-corner tl" aria-hidden="true" />
+                <span className="row-lock-corner tr" aria-hidden="true" />
+                <span className="row-lock-corner bl" aria-hidden="true" />
+                <span className="row-lock-corner br" aria-hidden="true" />
+              </>}
+              <ModuleIcon moduleId={module.id} />
+              <div>
+                <div className="row-between"><strong>{module.quarter}: {module.title}</strong><span>{modulePercent}%</span></div>
+                <div className="progress-track"><span style={{ width: `${modulePercent}%` }} /></div>
+                <div className="row-between"><small>{completed} of {REQUIRED_STAGES.length} stages</small>{grade && <small className={`graded-badge${justGraded.has(module.id) ? " graded-badge-new" : ""}`}>Graded{grade.score != null ? ` · ${grade.score}/100` : ""}</small>}</div>
+              </div>
+            </button>
+          );
+        })}
       </div> : <p className="muted progress-empty">{empty}</p>}
     </section>
   );

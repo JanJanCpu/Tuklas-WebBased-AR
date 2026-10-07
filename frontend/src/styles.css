@@ -178,6 +178,65 @@ small {
 .scan-corner.bl { bottom: 10px; left: 10px; border-bottom: 3px solid var(--gold); border-left: 3px solid var(--gold); border-radius: 0 0 0 6px; }
 .scan-corner.br { bottom: 10px; right: 10px; border-bottom: 3px solid var(--gold); border-right: 3px solid var(--gold); border-radius: 0 0 6px 0; }
 
+/* "Capture confirmed" - the completion celebration for finishing a module's three
+   stages, built from the same viewfinder-bracket language as .scan-corner instead of a
+   generic confetti burst. Plays once, the moment a module crosses into "done" this
+   session (App.tsx tracks this - never replays for modules that were already complete
+   when the page loaded), like a camera achieving focus-lock, then disappears for good -
+   a felt moment rather than a badge left glowing on every completed row forever. */
+.row-capture-lock {
+  position: relative;
+  animation: capture-lock-glow 1300ms ease;
+}
+
+.row-lock-corner {
+  position: absolute;
+  z-index: 5;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  opacity: 0;
+  animation: capture-lock-corner 1300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.row-lock-corner.tl { top: 4px; left: 4px; border-top: 2px solid var(--gold); border-left: 2px solid var(--gold); border-radius: 4px 0 0 0; }
+.row-lock-corner.tr { top: 4px; right: 4px; border-top: 2px solid var(--gold); border-right: 2px solid var(--gold); border-radius: 0 4px 0 0; animation-delay: 40ms; }
+.row-lock-corner.bl { bottom: 4px; left: 4px; border-bottom: 2px solid var(--gold); border-left: 2px solid var(--gold); border-radius: 0 0 0 4px; animation-delay: 40ms; }
+.row-lock-corner.br { bottom: 4px; right: 4px; border-bottom: 2px solid var(--gold); border-right: 2px solid var(--gold); border-radius: 0 0 4px 0; animation-delay: 80ms; }
+
+@keyframes capture-lock-corner {
+  0% { opacity: 0; transform: scale(2.2); }
+  22% { opacity: 1; transform: scale(1); }
+  78% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+@keyframes capture-lock-glow {
+  0% { background: transparent; }
+  30% { background: rgba(247, 198, 0, 0.12); }
+  100% { background: transparent; }
+}
+
+/* A small permanent upgrade (pill shape instead of bare colored text) plus a one-time
+   gold flash into its resting blue when a grade has just arrived this session. */
+.graded-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--blue) !important;
+  background: #eaf2ff;
+}
+
+.graded-badge-new {
+  animation: graded-pop 700ms ease;
+}
+
+@keyframes graded-pop {
+  0% { background: rgba(247, 198, 0, 0.5); transform: scale(1.08); }
+  100% { background: #eaf2ff; transform: scale(1); }
+}
+
 .hero-scan-icon {
   display: inline-flex;
   align-items: center;
@@ -278,10 +337,31 @@ small {
 }
 
 .primary-button {
+  position: relative;
+  overflow: hidden;
   border: 0;
   color: #fff;
   background: linear-gradient(135deg, var(--blue) 0%, var(--blue-dark) 100%);
   box-shadow: 0 10px 22px rgba(15, 76, 154, 0.32);
+}
+
+/* A camera-shutter flash on press instead of a generic bounce - every primary action in
+   Tuklas reads as "capturing" something, consistent with the AR/viewfinder identity rather
+   than a borrowed game-reward feel. Pure CSS: flashes instantly on press, fades on release,
+   so even a quick tap still shows it. */
+.primary-button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.55);
+  opacity: 0;
+  transition: opacity 450ms ease;
+  pointer-events: none;
+}
+
+.primary-button:active::after {
+  opacity: 1;
+  transition: opacity 0ms;
 }
 
 .secondary-button,
@@ -538,6 +618,19 @@ small {
   .screen.active {
     animation: none;
   }
+
+  .row-capture-lock {
+    animation: none;
+  }
+
+  .row-lock-corner {
+    display: none;
+  }
+
+  .graded-badge-new {
+    animation: none;
+    background: rgba(247, 198, 0, 0.3);
+  }
 }
 
 /* Edges are drawn with shadow alone, not a visible 1px border - a bordered card reads as an
@@ -685,6 +778,7 @@ small {
 }
 
 .module-progress-row {
+  position: relative;
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr);
   gap: 10px;
@@ -722,10 +816,6 @@ button.module-progress-row {
   font: inherit;
   text-align: left;
   cursor: pointer;
-}
-
-.graded-badge {
-  color: var(--blue) !important;
 }
 
 .marker-access,
