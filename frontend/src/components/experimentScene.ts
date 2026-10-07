@@ -658,10 +658,16 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     });
   } else if (id === "earth-scale") {
     // A globe with a quarter cut away, so every layer shows on the two flat cut faces (radii to scale).
+    // The missing wedge is centered off to one side (not phi=PI/2, which faces the camera
+    // almost head-on) so the camera mostly sees the intact rounded sphere, with the cutaway
+    // visible as an angled "bite" - the standard textbook cutaway-globe look. Centering the
+    // wedge on the camera used to show almost nothing but the two flat interior cut faces,
+    // which read as a flat heart/apple shape with no sense of "this is a sphere."
     const R = 1.75;
     const scale = R / 6371;
     const cut = Math.PI / 2;
-    const phiStart = Math.PI / 2 + cut / 2; const phiLength = Math.PI * 2 - cut;
+    const wedgeCenter = Math.PI * 0.3;
+    const phiStart = wedgeCenter + cut / 2; const phiLength = Math.PI * 2 - cut;
     const globe = new THREE.Group(); globe.rotation.x = 0.32; root.add(globe);
 
     // Surface: painted oceans and continents (generated, no image asset).
@@ -684,10 +690,17 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       const shell = new THREE.Mesh(new THREE.SphereGeometry(layer.outer * scale, 56, 40, phiStart, phiLength), new THREE.MeshStandardMaterial({ color: index === 0 ? 0xffffff : layer.color, map: index === 0 ? surface : null, roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide }));
       registry.push(shell); globe.add(shell); return shell;
     });
-    // Flat cut faces: a half ring per layer on each of the two cut planes.
-    const cutAngles = [Math.PI / 2 - cut / 2, Math.PI / 2 + cut / 2];
+    // Flat cut faces: a full ring per layer on each of the two cut planes. The wedge
+    // removed runs pole to pole, so each meridian plane exposes the sphere's complete
+    // circular cross-section at that layer's radius - a half ring (as this used to read)
+    // only draws a semicircle. Visually near-identical to a full ring from the default
+    // camera angle (the far half sits where the sphere's own bulk already occludes it),
+    // but it's the geometrically correct cross-section and matters once the wedge isn't
+    // centered on the camera - see wedgeCenter below, the actual fix for the heart/apple
+    // silhouette this view used to have.
+    const cutAngles = [wedgeCenter - cut / 2, wedgeCenter + cut / 2];
     const faces = earthLayers.map((layer, index) => cutAngles.map(angle => {
-      const face = mesh(new THREE.RingGeometry(layer.inner * scale, layer.outer * scale, 56, 1, -Math.PI / 2, Math.PI), layer.color, 0, 0, 0, globe, { roughness: 0.55, emissive: index >= 4 ? layer.color : undefined, emissiveIntensity: 0.22 });
+      const face = mesh(new THREE.RingGeometry(layer.inner * scale, layer.outer * scale, 56), layer.color, 0, 0, 0, globe, { roughness: 0.55, emissive: index >= 4 ? layer.color : undefined, emissiveIntensity: 0.22 });
       face.rotation.y = Math.PI + angle;
       if (index === 1 || index === 2) { face.material.polygonOffset = true; face.material.polygonOffsetFactor = -2; face.material.polygonOffsetUnits = -2; }
       return face;
