@@ -326,7 +326,7 @@ export const modules = [
       }
     ],
     "observe": "Add the compositional layers from inside outward, then identify the overlapping lithosphere and asthenosphere.",
-    "overview": "The model uses a 6,371 km radius: inner core to 1,221 km radius, outer core to 3,480 km, mantle to a representative 35 km crust. Lithosphere (0-100 km depth) includes crust and uppermost mantle; asthenosphere (100-350 km here) lies within the mantle. These shallow boundaries vary by location and are overlays, not extra concentric compositional layers."
+    "overview": "The model uses a 6,371 km radius: inner core to 1,221 km radius, outer core to 3,480 km, lower mantle to 5,711 km radius (660 km depth), upper mantle up to a representative 35 km crust. Lithosphere (0-100 km depth) includes crust and uppermost mantle; asthenosphere (100-350 km here) lies within the upper mantle. These shallow boundaries vary by location and are overlays, not extra concentric compositional layers."
   },
   {
     "id": "replication",

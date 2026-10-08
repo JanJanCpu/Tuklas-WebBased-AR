@@ -12,7 +12,8 @@ export const earthLayers = [
   { name: "Crust", depth: "0–35 km", inner: 6336, outer: 6371, color: 0x438454 },
   { name: "Lithosphere", depth: "0–100 km", inner: 6271, outer: 6371, color: 0x30b8b4 },
   { name: "Asthenosphere", depth: "100–350 km", inner: 6021, outer: 6271, color: 0xb965cc },
-  { name: "Mantle", depth: "35–2,891 km", inner: 3480, outer: 6336, color: 0xe58b35 },
+  { name: "Upper mantle", depth: "35–660 km", inner: 5711, outer: 6336, color: 0xf6c479 },
+  { name: "Lower mantle", depth: "660–2,891 km", inner: 3480, outer: 5711, color: 0xd9752a },
   { name: "Outer core", depth: "2,891–5,150 km", inner: 1221, outer: 3480, color: 0xecc23f },
   { name: "Inner core", depth: "5,150–6,371 km", inner: 0, outer: 1221, color: 0xd84a4a },
 ];
@@ -27,7 +28,7 @@ export const controls = {
   "chemical-change": [control("Vinegar", 0, 3, "portions"), control("Baking soda", 0, 3, "portions")],
   bonding: [control("Bond model", 0, 1), control("Model rotation", 0, 3)],
   seismic: [control("Wave type", 0, 1), control("Material", 0, 1)],
-  "earth-scale": [control("View", 0, 1), control("Selected layer", 0, 5)],
+  "earth-scale": [control("View", 0, 1), control("Selected layer", 0, 6)],
   replication: [control("Strands", 0, 1), control("Model rotation", 0, 3)],
   mutation: [control("Mutation", 0, 3), control("Base position", 1, 12)],
 } as const;
@@ -84,7 +85,7 @@ export function getObservationModel(id: string, a: number, b: number, lab = init
   } else if (id === "chemical-change") values = [["Vinegar", `${a} portions`], ["Baking soda", `${b} portions`], ["Evidence", a && b ? "CO₂ bubbles: new substance formed" : "No reaction yet"], ["Reaction amount", `${Math.min(a, b)} (qualitative units)`]];
   else if (id === "bonding") values = [["Model", a ? "H₂O: covalent" : "NaCl: ionic"], ["Electrons", a ? `${lab.electrons}/2 shared pairs placed` : lab.electrons ? "1 electron transferred: Na⁺ and Cl⁻" : "Neutral Na and Cl"]];
   else if (id === "seismic") values = [["Wave", a ? "S: transverse" : "P: longitudinal"], ["Layer", b ? "Liquid outer core" : "Solid mantle"], ["Transmission", a && b ? "Blocked; no shear propagation" : "Transmitted"], ["Inference", a && b ? "Supports a liquid outer core" : "Compare with the other wave/material"]];
-  else if (id === "earth-scale") { const l = earthLayers[b]; values = [["Layer", l.name], ["Depth below surface", l.depth], ["Thickness", `${l.outer - l.inner} km (representative)`], ["Assembly", `${lab.layers}/4 compositional layers`], ["Scale", a ? "Surface depth magnified ×10" : "Radius 6,371 km; true relative scale"]]; }
+  else if (id === "earth-scale") { const l = earthLayers[b]; values = [["Layer", l.name], ["Depth below surface", l.depth], ["Thickness", `${l.outer - l.inner} km (representative)`], ["Assembly", `${lab.layers}/5 compositional layers`], ["Scale", a ? "Surface depth magnified ×10" : "Radius 6,371 km; true relative scale"]]; }
   else if (id === "replication") { const correct = lab.basePairs.filter((base, i) => base === (i < 6 ? complement(template[i]) : template[i - 6])).length; values = [["Template", template], ["Complement", template.split("").map(complement).join("")], ["Matched bases", `${correct}/12 across two daughter molecules`], ["Result", correct === 12 ? "Two copies: each has one old and one new strand" : "Match A–T and C–G"]]; }
   else if (id === "mutation") { const m = mutationState(a, b); values = [["Original DNA", originalDna], ["New DNA", m.dna], ["Original protein", translate(originalDna)], ["New protein", m.protein], ["Possible effect", m.effect]]; }
   else values = [["Force", `${a} N`], [id === "inertia" ? "Initial velocity" : "Mass", id === "inertia" ? `${b} m/s` : `${b} kg`], ["Acceleration", `${(a / (id === "inertia" ? 1 : b)).toFixed(2)} m/s²`], ["Observation", id === "launcher" ? `Air: ${a} N backward; cart: ${a} N forward` : a ? "Velocity changes with time" : id === "inertia" && b ? "Constant velocity" : "Remains at rest"]];

@@ -685,9 +685,14 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     const surface = new THREE.CanvasTexture(earthCanvas); surface.colorSpace = THREE.SRGBColorSpace;
 
     // Solid shells for each compositional layer, built from the center outward.
-    const buildOrder = [5, 4, 3, 0];
+    const buildOrder = [6, 5, 4, 3, 0];
+    // Lithosphere and asthenosphere cut across the compositional layers, so they are overlays
+    // on the finished globe rather than steps you build. Named, not index-matched, because the
+    // mini copy below has to know which clones to hide and index math broke when a layer was added.
+    const isOverlay = (index: number) => index === 1 || index === 2;
     const shells = earthLayers.map((layer, index) => {
       const shell = new THREE.Mesh(new THREE.SphereGeometry(layer.outer * scale, 56, 40, phiStart, phiLength), new THREE.MeshStandardMaterial({ color: index === 0 ? 0xffffff : layer.color, map: index === 0 ? surface : null, roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide }));
+      shell.name = isOverlay(index) ? "overlay" : "layer";
       registry.push(shell); globe.add(shell); return shell;
     });
     // Flat cut faces: a full ring per layer on each of the two cut planes. The wedge
@@ -700,20 +705,22 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     // silhouette this view used to have.
     const cutAngles = [wedgeCenter - cut / 2, wedgeCenter + cut / 2];
     const faces = earthLayers.map((layer, index) => cutAngles.map(angle => {
-      const face = mesh(new THREE.RingGeometry(layer.inner * scale, layer.outer * scale, 56), layer.color, 0, 0, 0, globe, { roughness: 0.55, emissive: index >= 4 ? layer.color : undefined, emissiveIntensity: 0.22 });
+      const face = mesh(new THREE.RingGeometry(layer.inner * scale, layer.outer * scale, 56), layer.color, 0, 0, 0, globe, { roughness: 0.55, emissive: index >= 5 ? layer.color : undefined, emissiveIntensity: 0.22 });
       face.rotation.y = Math.PI + angle;
-      if (index === 1 || index === 2) { face.material.polygonOffset = true; face.material.polygonOffsetFactor = -2; face.material.polygonOffsetUnits = -2; }
+      face.name = isOverlay(index) ? "overlay" : "layer";
+      if (isOverlay(index)) { face.material.polygonOffset = true; face.material.polygonOffsetFactor = -2; face.material.polygonOffsetUnits = -2; }
       return face;
     }));
-    const ghost = mesh(new THREE.SphereGeometry(R, 32, 22, phiStart, phiLength), 0x4a78a8, 0, 0, 0, globe, { opacity: 0.55, roughness: 0.4 }); ghost.material.wireframe = true;
+    const ghost = mesh(new THREE.SphereGeometry(R, 32, 22, phiStart, phiLength), 0x4a78a8, 0, 0, 0, globe, { opacity: 0.55, roughness: 0.4 }); ghost.material.wireframe = true; ghost.name = "ghost";
     const air = mesh(new THREE.SphereGeometry(R * 1.06, 40, 28), 0x6fb7ff, 0, 0, 0, globe, { opacity: 0.22, emissive: 0x3d8bff, emissiveIntensity: 0.5 }); air.material.side = THREE.BackSide;
-    const caption = label("", 0, 2.3, 5.4);
-    // The four layers waiting to be built, center first. Drag one onto the globe, or tap it.
-    const chipHomes = buildOrder.map((_, order) => new THREE.Vector3(-2.25 + order * 1.5, -2.3, 0.2));
+    const caption = label("", 0, 2.65, 5.4);
+    // The five layers waiting to be built, center first. Drag one onto the globe, or tap it.
+    // Placed ones stay in the row and become the finished globe's colour legend.
+    const chipHomes = buildOrder.map((_, order) => new THREE.Vector3(-2.4 + order * 1.2, -2.3, 0.2));
     const chips = buildOrder.map((layerIndex, order) => {
       const chip = new THREE.Group(); chip.position.copy(chipHomes[order]); root.add(chip);
-      mesh(new THREE.SphereGeometry(0.3, 20, 14), earthLayers[layerIndex].color, 0, 0, 0, chip, { roughness: 0.4 });
-      label(earthLayers[layerIndex].name, 0, -0.55, 1.4, chip, 4);
+      mesh(new THREE.SphereGeometry(0.26, 20, 14), earthLayers[layerIndex].color, 0, 0, 0, chip, { roughness: 0.4 });
+      label(earthLayers[layerIndex].name, 0, -0.5, 1.02, chip, 4);
       return chip;
     });
     const feedback = { text: "", until: 0 };
@@ -721,13 +728,17 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     let sceneTime = 0;
     const tryPlace = (order: number, api: InteractionApi) => {
       const { lab } = api.values();
+      if (order < lab.layers) return;
       if (buildOrder[lab.layers] === buildOrder[order]) { api.setLab({ layers: lab.layers + 1 }); feedback.text = `${earthLayers[buildOrder[order]].name} placed at its scaled radius`; }
       else feedback.text = "Build from the center outward";
       feedback.until = sceneTime + 2.2;
     };
 
     // Surface-detail view: a 3D slab of the top 350 km with rock textures, depth tags, and brackets for the two ways of naming layers.
-    const detail = new THREE.Group(); detail.rotation.x = 0.28; root.add(detail);
+    // Scaled to 0.9 so this view occupies roughly the same box as the globe view. The camera
+    // frames the union of both views (see sceneBounds in ScienceScene), so a detail view that
+    // sprawls wider than the globe pushes the globe off-centre and shrinks it on the other screen.
+    const detail = new THREE.Group(); detail.rotation.x = 0.28; detail.scale.setScalar(0.9); root.add(detail);
     const rock = (baseColor: string, accent: string, kind: "grain" | "flow", seedStart: number) => {
       const canvas = document.createElement("canvas"); canvas.width = 256; canvas.height = 128;
       const g = canvas.getContext("2d")!; g.fillStyle = baseColor; g.fillRect(0, 0, 256, 128);
@@ -758,7 +769,7 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       [top, bottom].forEach(y => mesh(new THREE.BoxGeometry(0.2, 0.04, 0.05), 0xdde6ef, x - side * 0.08, y, 0.5, detail, finish));
       label(text, x + side * 0.85, (top + bottom) / 2, 1.5, detail, 4);
     };
-    bracket(0, 35, -1.3, "Crust", -1); bracket(35, 432, -1.3, "Mantle to 2,891 km", -1);
+    bracket(0, 35, -1.3, "Crust", -1); bracket(35, 432, -1.3, "Upper mantle to 660 km", -1);
     bracket(0, 100, 1.3, "Lithosphere", 1); bracket(100, 350, 1.3, "Asthenosphere", 1);
     [35, 100, 350].forEach(depth => { const tag = label(`${depth} km`, 0.62, surfaceY - depth * H, 0.85, detail, 4); tag.sprite.position.z = 0.55; });
     // Below the asthenosphere the mantle carries on: fade the slab out into orange mantle instead of ending in a hard edge.
@@ -772,27 +783,24 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     label("Left: what it is made of · Right: how it behaves", 0, -2.68, 5.2, detail, 12);
     label("Tap a layer to select it", 0, -3.05, 3.2, detail, 10);
     // A small copy of the same globe (shared geometry and materials) shows where the magnified
-    // slab comes from. Sat well above and right of the slab's own brackets/labels - those labels
-    // (e.g. "Lithosphere") are wide text sprites that reach past x=2.5, and the mini globe used to
-    // sit right on top of them with no backing of its own, reading as a loose sticker rather than
-    // a grounded part of the scene. A simple two-circle "badge" (a darker ring behind a light
-    // fill, the cheapest way to fake a bordered card with flat 3D geometry) gives it a home.
-    const miniX = 3.3, miniY = 1.65;
-    const badgeRing = mesh(new THREE.CircleGeometry(0.62, 32), 0xaec4e0, miniX, miniY, -0.2, root, { roughness: 1 });
-    const badgeFill = mesh(new THREE.CircleGeometry(0.56, 32), 0xf5f8fc, miniX, miniY, -0.15, root, { roughness: 1 });
-    const mini = new THREE.Group(); mini.scale.setScalar(0.2); mini.position.set(miniX, miniY, 0.3); mini.rotation.x = 0.32; root.add(mini);
+    // slab comes from: a badge (a darker ring behind a light fill - the cheapest way to fake a
+    // bordered card with flat 3D geometry) with a red marker on the surface and one leader line
+    // down to the top of the slab. The line has to end on the slab's *ground* line, not above it:
+    // `detail` is tilted (rotation.x) while the line is not, so the slab's apparent top sits lower
+    // than its untilted y - aiming at the raw y made the line point past the mountain into empty sky.
+    const miniX = 2.45, miniY = 1.72;
+    const badgeRing = mesh(new THREE.CircleGeometry(0.5, 32), 0xaec4e0, miniX, miniY, -0.2, root, { roughness: 1 });
+    const badgeFill = mesh(new THREE.CircleGeometry(0.45, 32), 0xf5f8fc, miniX, miniY, -0.15, root, { roughness: 1 });
+    const mini = new THREE.Group(); mini.scale.setScalar(0.14); mini.position.set(miniX, miniY, 0.3); mini.rotation.x = 0.32; root.add(mini);
     globe.children.forEach(child => mini.add(child.clone()));
-    mini.children.forEach((child, k) => {
-      if (k < 6) child.visible = buildOrder.includes(k);
-      else if (k < 18) child.visible = buildOrder.includes(Math.floor((k - 6) / 2));
-      else child.visible = k !== 18;
+    mini.children.forEach(child => {
+      child.visible = child.name === "layer";
       if ((child as THREE.Mesh).isMesh) registry.push(child as THREE.Mesh);
     });
     mesh(new THREE.SphereGeometry(0.16, 10, 8), 0xff4d4d, 0, R, 0, mini, { emissive: 0xff2222, emissiveIntensity: 0.9 });
-    const zoomLine = line([[miniX - 0.5, miniY - 0.15, 0.3], [0.75, 1.8, 0.3]], 0xff4d4d);
-    const zoomLabel = label("Zoomed in here", miniX, miniY - 1.3, 1.4, root, 5);
+    const zoomLine = line([[miniX - 0.42, miniY - 0.17, 0.3], [0.88, 1.12, 0.3]], 0xff4d4d);
     interact = {
-      targets: { crust: blocks[0], upper: blocks[1], soft: blocks[2], chip0: chips[0], chip1: chips[1], chip2: chips[2], chip3: chips[3] },
+      targets: { crust: blocks[0], upper: blocks[1], soft: blocks[2], ...Object.fromEntries(chips.map((chip, order) => [`chip${order}`, chip])) },
       down: (name, point) => { if (name.startsWith("chip")) { heldChip.index = Number(name.slice(4)); heldChip.x = point.x; heldChip.y = point.y; } },
       move: (name, point) => { if (name.startsWith("chip")) { heldChip.x = point.x; heldChip.y = point.y; } },
       up: (name, point, moved, api) => {
@@ -804,16 +812,16 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     updates.push((time, a, b, lab) => {
       globe.visible = !a; detail.visible = Boolean(a);
       textures[2].offset.x = (time * 0.05) % 1;
-      mini.visible = Boolean(a); zoomLine.visible = Boolean(a); zoomLabel.sprite.visible = Boolean(a); badgeRing.visible = Boolean(a); badgeFill.visible = Boolean(a); mini.rotation.y = Math.sin(time * 0.45) * 0.28;
+      mini.visible = Boolean(a); zoomLine.visible = Boolean(a); badgeRing.visible = Boolean(a); badgeFill.visible = Boolean(a); mini.rotation.y = Math.sin(time * 0.45) * 0.28;
       sceneTime = time;
       chips.forEach((chip, order) => {
-        chip.visible = !a && order >= lab.layers;
+        chip.visible = !a;
         if (heldChip.index === order) chip.position.set(heldChip.x, heldChip.y, 0.3); else chip.position.lerp(chipHomes[order], 0.25);
         chip.scale.setScalar(order === lab.layers ? 1 + 0.08 * Math.sin(time * 4) : 0.9);
       });
       blocks.forEach((block, i) => { const on = b === 0 ? i === 0 : b === 1 ? i <= 1 : b === 2 ? i === 2 : false; block.material.emissive.setHex(on ? [0x4a8a58, 0x35b0aa, 0xb060c4][i] : 0); block.material.emissiveIntensity = on ? 0.45 + 0.25 * Math.sin(time * 3) : 0; });
       globe.rotation.y = Math.sin(time * 0.45) * 0.28;
-      const complete = lab.layers === 4;
+      const complete = lab.layers === buildOrder.length;
       air.visible = complete; ghost.visible = !complete;
       earthLayers.forEach((_, i) => {
         const order = buildOrder.indexOf(i);
@@ -823,11 +831,11 @@ export function createExperimentScene(root: THREE.Group, id: string) {
         const selected = i === b;
         faces[i].forEach(face => {
           face.visible = overlay ? complete && selected : built;
-          face.material.emissive.setHex(selected ? 0x554422 : i >= 4 ? earthLayers[i].color : 0);
+          face.material.emissive.setHex(selected ? 0x554422 : i >= 5 ? earthLayers[i].color : 0);
           face.material.emissiveIntensity = selected ? 0.7 + 0.5 * Math.sin(time * 3) : 0.22;
         });
       });
-      caption.set(!a && time < feedback.until ? feedback.text : lab.layers === 0 && !a ? "Drag the Inner core onto the globe to start" : lab.layers < 4 && !a ? "Now add the next layer, working outward" : `${earthLayers[b].name}: ${earthLayers[b].depth}`);
+      caption.set(!a && time < feedback.until ? feedback.text : lab.layers === 0 && !a ? "Drag the Inner core onto the globe to start" : lab.layers < buildOrder.length && !a ? "Now add the next layer, working outward" : `${earthLayers[b].name}: ${earthLayers[b].depth}`);
     });
   } else if (id === "replication") {
     // Two strands twist round each other. "Separate and copy" unzips them from the left, and a new strand (orange) builds on each old one (blue).
