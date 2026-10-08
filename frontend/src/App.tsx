@@ -10,7 +10,7 @@ import { getObservationModel, getObservationDefaults, formatControlValue, initia
 import { ExperimentControls } from "./components/ExperimentControls";
 import { AccountDetails } from "./components/AccountDetails";
 import type { ActivityRecord, AuthUser, ClassProgressRecord, Feedback, LearningModule, Role, Screen, Section, SectionSummary, Stage, ViewMode } from "./types/domain";
-import { Activity, BookOpen, ChevronLeft, ChevronRight, CircuitBoard, Download, KeyRound, Earth, Eye, Home, Microscope, Printer, ScanLine, Settings, Thermometer, Users, type LucideIcon } from "lucide-react";
+import { Activity, BookOpen, ChevronLeft, ChevronRight, CircuitBoard, Download, KeyRound, Mail, MessageSquare, Earth, Eye, Home, Microscope, Printer, ScanLine, Settings, Thermometer, Users, type LucideIcon } from "lucide-react";
 
 // three.js (pulled in by ScienceScene) is a heavy dependency that only the
 // Observe screen and its fallback 3D preview need - lazy-loading it keeps
@@ -1245,7 +1245,22 @@ function Workspace({ user }: { user: AuthUser | null }) {
               <article className="panel-card">
                 <p className="eyebrow">Login Slips</p>
                 <h2>{slips.length} login{slips.length === 1 ? "" : "s"} ready to print</h2>
-                <p>Print and cut these now. Passwords are not saved and cannot be shown again; if a slip gets lost, use New Password on that student.</p>
+                <p>Print and cut these now, or send each one from your own phone by SMS or email (the app does not store any number or address). Passwords are not saved and cannot be shown again; if a slip gets lost, use New Password on that student.</p>
+                <div className="records-list">
+                  {slips.map((slip) => {
+                    const message = encodeURIComponent(`Tuklas AR login for ${slip.name}: username ${slip.username}, password ${slip.password}. Open ${window.location.host} to log in. Keep this private.`);
+                    return (
+                      <div className="row-between slip-row" key={slip.username}>
+                        <span><small>{slip.username}</small><p>{slip.name}</p></span>
+                        <span className="slip-share">
+                          {/* "sms:?&body=" is the form both Android and iOS Messages accept. */}
+                          <a className="secondary-button compact-button" href={`sms:?&body=${message}`}><MessageSquare size={16} />SMS</a>
+                          <a className="secondary-button compact-button" href={`mailto:?subject=${encodeURIComponent("Tuklas AR login")}&body=${message}`}><Mail size={16} />Email</a>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
                 <div className="row-between">
                   <button type="button" className="primary-button" onClick={printSlips}><Printer size={18} />Print Slips</button>
                   <button type="button" className="text-button" onClick={() => { if (window.confirm("Clear the slips? Unprinted passwords will be lost.")) setSlips([]); }}>Clear</button>

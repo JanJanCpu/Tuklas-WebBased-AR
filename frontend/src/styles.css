@@ -2002,3 +2002,24 @@ input[type="range"] {
   color: #444;
   font-size: 8.5pt;
 }
+
+.slip-row {
+  flex-wrap: wrap;
+}
+
+.slip-row p {
+  margin: 0;
+}
+
+.slip-share {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.slip-share a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+}
