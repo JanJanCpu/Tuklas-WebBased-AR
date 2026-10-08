@@ -94,6 +94,13 @@ export function createSectionStudent(sectionId: string, username: string, passwo
   });
 }
 
+export function setStudentPassword(sectionId: string, studentId: string, password: string) {
+  return request<{ ok: true }>(`/sections/${sectionId}/students/${studentId}/password`, {
+    method: "POST",
+    body: JSON.stringify({ password }),
+  });
+}
+
 export function resetStudentProgress(studentId: string, moduleId?: string) {
   return request<{ deleted: number }>(`/auth/students/${studentId}/reset-progress`, {
     method: "POST",

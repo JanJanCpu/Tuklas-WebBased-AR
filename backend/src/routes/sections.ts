@@ -158,6 +158,34 @@ sectionsRouter.post("/:id/students", async (request, response, next) => {
   }
 });
 
+// Teacher issues a new password for a student who lost their login slip.
+// updateMany scoped to the owned section, so another teacher's student 404s.
+sectionsRouter.post("/:id/students/:studentId/password", async (request, response, next) => {
+  if (!requireDatabase(response)) return;
+
+  try {
+    const section = await loadOwnedSection(request.user!.sub, request.params.id);
+    if (!section) {
+      response.status(404).json({ error: "Section not found." });
+      return;
+    }
+
+    const { password } = z.object({ password: passwordSchema }).parse(request.body);
+    const updated = await prisma.user.updateMany({
+      where: { id: request.params.studentId, sectionId: section.id, role: "student" },
+      data: { passwordHash: await hashPassword(password) },
+    });
+    if (!updated.count) {
+      response.status(404).json({ error: "Student not found." });
+      return;
+    }
+
+    response.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
 const feedbackSchema = z.object({
   score: z.number().int().min(0).max(100).nullable().optional(),
   comment: z.string().trim().min(1, "Feedback is required.").max(2000),

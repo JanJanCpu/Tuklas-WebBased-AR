@@ -12,7 +12,7 @@ Capstone: "Development of an Offline Augmented Reality Science Laboratory Simula
 
 This is **pre-defense**, in a dedicated polish window before the panel and before school testing:
 1. Thesis audit against the code, research instruments, and Chapter 4/5 drafted from real data only are done. Never fabricate results, scores or logs; every number in the thesis comes from the real pilot data.
-2. **Now (through the polish window):** the adviser/panel wants the AR more dynamic ("Pokemon GO level", less flat and static, replacing physical lab objects, hand/touch manipulation) and the general app UI polished, before the upgraded build is used for real SOP1/2/3 testing at Antonio A. Maceda Integrated School (letters 1/2/6 are for arranging that testing) and before the October defense. All of this lives on the fork branch `feature/dynamic-ar`. Latest build label: **b34**.
+2. **Now (through the polish window):** the adviser/panel wants the AR more dynamic ("Pokemon GO level", less flat and static, replacing physical lab objects, hand/touch manipulation) and the general app UI polished, before the upgraded build is used for real SOP1/2/3 testing at Antonio A. Maceda Integrated School (letters 1/2/6 are for arranging that testing) and before the October defense. All of this lives on the fork branch `feature/dynamic-ar`. Latest build label: **b35**.
 3. **After school testing, before the defense:** the real data from that testing (curriculum validation, pretest/posttest, SUS) needs to go into Chapter 4/5 and the appendices, replacing/extending whatever pilot data is there now.
 
 Open items:
@@ -81,6 +81,8 @@ JWT auth (`backend/src/lib/auth.ts`), no sessions/cookies; the frontend sends `A
 Two roles:
 - **Teacher**: self-signup (`POST /api/auth/register-teacher`).
 - **Student**: teacher-provisioned only, and only through a `Section` (`POST /api/sections/:id/students`). `User.createdById` links a student to the teacher; `User.sectionId` to their `Section`; `Section.teacherId` to the owner teacher. Every teacher-facing list filters by one of these FKs and every mutation checks ownership first (`sections.ts`'s `loadOwnedSection`, the reset-progress route). A second teacher's request 404s rather than 403s, deliberately.
+
+Account distribution (panel question, 2026-10-08): no SMS or email. That would mean paying per message, collecting minors' contact details under RA 10173, and relying on students having their own phone or email. Instead, a section screen has "Add Whole Class": the teacher pastes the class list (plain names or SF1 `LAST, FIRST M.` style), `lib/credentials.ts` generates a username (`juan.delacruz482`, retried on a 409) and a word+4-digit password, the frontend loops the existing create-student endpoint, and the logins become printable A4 cut-out slips (`.slip-sheet`, portalled next to `#root`, shown only under `body.printing-slips`). Slip passwords live in React state only, never in storage, and can't be shown again; a lost slip means using "New Password" on that student (`POST /api/sections/:id/students/:studentId/password`), which adds a fresh slip.
 
 `ActivityRecord` (Predict/Observe/Explain/Reflection submissions) is the single source of truth for progress. A stage is "done" once a record with that `(userId, moduleId, stage)` exists. `frontend/src/App.tsx` derives all progress/lock UI from the in-memory `records` array via `stagesFor()`/`REQUIRED_STAGES` (Predict/Observe/Explain; Reflection is optional and never locks). Do not reintroduce a parallel progress flag; it drifted out of sync before.
 
@@ -165,7 +167,7 @@ Three.js 0.164.1 + AR.js scene. Studio environment lighting + ACES tone mapping.
 Auto step-down when fps stays under 19, persisted in `localStorage` as `tuklas-quality-v2`:
 - 0 full; 1 marker detection every 2nd frame; 2 pixelRatio 1 + 320x240 tracking canvas (`trackingSize`, `trackingLow` state); 3 Lambert (cheaper) shading.
 
-URL parameters: `?fps=1` (HUD: `render N fps | qN dN tNNN[ empty] | bNN`), `?q=<0-3>` force a level, `?detect=<n>` detect every n frames, `?empty=1` empty scene (isolates tracking cost). The HUD build label (currently `b34`, a string in `ScienceScene.tsx`) is how you confirm a phone loaded the new build; bump it on every change you want to verify remotely.
+URL parameters: `?fps=1` (HUD: `render N fps | qN dN tNNN[ empty] | bNN`), `?q=<0-3>` force a level, `?detect=<n>` detect every n frames, `?empty=1` empty scene (isolates tracking cost). The HUD build label (currently `b35`, a string in `ScienceScene.tsx`) is how you confirm a phone loaded the new build; bump it on every change you want to verify remotely.
 
 ### Hand tracking (removed, 2026-10-08)
 Was an experimental MediaPipe Hand Landmarker spike (`lib/handTracking.ts`, `?hands=1|cpu`), **not viable on budget phones**: Poco C65 GPU 5-10 fps render and 160-330 ms per detection; CPU worse (1-3 fps while tracking). Touch manipulation is the only interaction now. Removed `lib/handTracking.ts`, the 31 MB `frontend/public/mediapipe/` model files, and the `@mediapipe/tasks-vision` dependency; the fps HUD lost its `hands N fps | N ms DELEGATE | state` segment accordingly.

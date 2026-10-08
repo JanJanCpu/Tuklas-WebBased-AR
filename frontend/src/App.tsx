@@ -1,6 +1,8 @@
+import { createPortal } from "react-dom";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
-import { ApiError, createSection, createSectionStudent, fetchClassProgress, fetchModules, fetchMyRecords, getSection, listSections, login as apiLogin, registerTeacher, resetStudentProgress, submitFeedback, syncRecords } from "./lib/api";
+import { ApiError, createSection, createSectionStudent, fetchClassProgress, fetchModules, fetchMyRecords, getSection, listSections, login as apiLogin, registerTeacher, resetStudentProgress, setStudentPassword as apiSetStudentPassword, submitFeedback, syncRecords } from "./lib/api";
 import { clearSession, getStoredUser, getToken, getSessionNotice, setSession, subscribeSession } from "./lib/auth";
+import { makePassword, makeUsername, parseClassList } from "./lib/credentials";
 import { createRecordSession } from "./lib/record-session";
 import { prepareOfflineFiles } from "./lib/offline";
 import { modules as fallbackModules } from "./data/modules";
@@ -8,7 +10,7 @@ import { getObservationModel, getObservationDefaults, formatControlValue, initia
 import { ExperimentControls } from "./components/ExperimentControls";
 import { AccountDetails } from "./components/AccountDetails";
 import type { ActivityRecord, AuthUser, ClassProgressRecord, Feedback, LearningModule, Role, Screen, Section, SectionSummary, Stage, ViewMode } from "./types/domain";
-import { Activity, BookOpen, ChevronLeft, ChevronRight, CircuitBoard, Download, Earth, Eye, Home, Microscope, Printer, ScanLine, Settings, Thermometer, Users, type LucideIcon } from "lucide-react";
+import { Activity, BookOpen, ChevronLeft, ChevronRight, CircuitBoard, Download, KeyRound, Earth, Eye, Home, Microscope, Printer, ScanLine, Settings, Thermometer, Users, type LucideIcon } from "lucide-react";
 
 // three.js (pulled in by ScienceScene) is a heavy dependency that only the
 // Observe screen and its fallback 3D preview need - lazy-loading it keeps
@@ -94,6 +96,12 @@ function Workspace({ user }: { user: AuthUser | null }) {
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<Section | null>(null);
   const [showAddStudent, setShowAddStudent] = useState(false);
+  const [showBulkAdd, setShowBulkAdd] = useState(false);
+  const [bulkNames, setBulkNames] = useState("");
+  const [bulkProgress, setBulkProgress] = useState("");
+  // Generated logins waiting to be printed. Memory only: passwords are hashed server-side and
+  // must never be written to storage on a shared classroom device.
+  const [slips, setSlips] = useState<{ name: string; section: string; username: string; password: string }[]>([]);
   const [sectionStudents, setSectionStudents] = useState<AuthUser[]>([]);
   const [sectionRecords, setSectionRecords] = useState<ClassProgressRecord[]>([]);
   const [sectionFeedback, setSectionFeedback] = useState<Feedback[]>([]);
@@ -576,6 +584,66 @@ function Workspace({ user }: { user: AuthUser | null }) {
     } catch (error) {
       setStudentFormError(error instanceof ApiError ? error.message : "Could not create student account.");
     }
+  }
+
+  async function handleBulkAdd(event: FormEvent) {
+    event.preventDefault();
+    if (!activeSectionId || bulkProgress) return;
+    const names = parseClassList(bulkNames);
+    if (!names.length) {
+      setStudentFormError("Paste at least one name.");
+      return;
+    }
+    setStudentFormError("");
+    const sectionName = activeSection?.name ?? "";
+    const created: typeof slips = [];
+    const failed: string[] = [];
+    for (const [index, name] of names.entries()) {
+      setBulkProgress(`Creating ${index + 1} of ${names.length}...`);
+      const password = makePassword();
+      let user: AuthUser | null = null;
+      // A 409 means the random username suffix collided; retry with a fresh one.
+      for (let attempt = 0; attempt < 3 && !user; attempt += 1) {
+        try {
+          user = (await createSectionStudent(activeSectionId, makeUsername(name), password, name)).user;
+        } catch (error) {
+          if (!(error instanceof ApiError && error.status === 409)) break;
+        }
+      }
+      if (user) {
+        const createdUser = user;
+        created.push({ name, section: sectionName, username: createdUser.username, password });
+        setSectionStudents((current) => [createdUser, ...current]);
+      } else {
+        failed.push(name);
+      }
+    }
+    setBulkProgress("");
+    setSlips((current) => [...current, ...created]);
+    setSections((current) => current.map((section) => (section.id === activeSectionId ? { ...section, studentCount: section.studentCount + created.length } : section)));
+    // Leave only the failures in the box so the teacher can retry them.
+    setBulkNames(failed.join("\n"));
+    if (failed.length) setStudentFormError(`${failed.length} could not be created (still in the box). Check your connection and try again.`);
+    showToast(`${created.length} student account${created.length === 1 ? "" : "s"} created. Print the login slips.`);
+  }
+
+  async function handleNewPassword(student: AuthUser) {
+    if (!activeSectionId) return;
+    if (!window.confirm(`Give ${student.name} a new password? Their old password will stop working.`)) return;
+    const password = makePassword();
+    try {
+      await apiSetStudentPassword(activeSectionId, student.id, password);
+      setSlips((current) => [...current.filter((slip) => slip.username !== student.username), { name: student.name, section: activeSection?.name ?? "", username: student.username, password }]);
+      showToast(`New password for ${student.username}: ${password}`);
+    } catch (error) {
+      showToast(error instanceof ApiError ? error.message : "Could not set a new password.");
+    }
+  }
+
+  function printSlips() {
+    document.body.classList.add("printing-slips");
+    window.addEventListener("afterprint", () => document.body.classList.remove("printing-slips"), { once: true });
+    window.print();
   }
 
   function logout() {
@@ -1158,6 +1226,33 @@ function Workspace({ user }: { user: AuthUser | null }) {
               )}
             </article>
             <article className="panel-card">
+              <button type="button" className="row-between disclosure-toggle" onClick={() => setShowBulkAdd((current) => !current)} aria-expanded={showBulkAdd}>
+                <span className="eyebrow">Add Whole Class</span>
+                <span className={`disclosure-chevron ${showBulkAdd ? "open" : ""}`} aria-hidden="true"><ChevronRight size={18} strokeWidth={2.4} /></span>
+              </button>
+              {showBulkAdd && (
+                <form className="auth-form compact-form" onSubmit={handleBulkAdd}>
+                  <label className="field-label">Class list, one name per line
+                    <textarea rows={8} placeholder={"Juan Dela Cruz\nSANTOS, MARIA L."} value={bulkNames} onChange={(event) => setBulkNames(event.target.value)} disabled={Boolean(bulkProgress)} />
+                  </label>
+                  <p className="muted">Usernames and passwords are made for you. Copying the names from the class list (SF1) works.</p>
+                  {studentFormError && <p className="auth-error" role="alert">{studentFormError}</p>}
+                  <button className="secondary-button" type="submit" disabled={Boolean(bulkProgress)}>{bulkProgress || `Create ${parseClassList(bulkNames).length || ""} Accounts`}</button>
+                </form>
+              )}
+            </article>
+            {slips.length > 0 && (
+              <article className="panel-card">
+                <p className="eyebrow">Login Slips</p>
+                <h2>{slips.length} login{slips.length === 1 ? "" : "s"} ready to print</h2>
+                <p>Print and cut these now. Passwords are not saved and cannot be shown again; if a slip gets lost, use New Password on that student.</p>
+                <div className="row-between">
+                  <button type="button" className="primary-button" onClick={printSlips}><Printer size={18} />Print Slips</button>
+                  <button type="button" className="text-button" onClick={() => { if (window.confirm("Clear the slips? Unprinted passwords will be lost.")) setSlips([]); }}>Clear</button>
+                </div>
+              </article>
+            )}
+            <article className="panel-card">
               <p className="eyebrow">Enrolled Students</p>
               <div className="records-list">
                 {sectionStudents.length ? sectionStudents.map((student) => {
@@ -1196,6 +1291,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
                           {studentRecords.length > 0 && (
                             <button type="button" className="secondary-button" onClick={() => handleResetProgress(student.id)}>Reset All Progress</button>
                           )}
+                          <button type="button" className="secondary-button" onClick={() => handleNewPassword(student)}><KeyRound size={16} />New Password</button>
                         </div>
                       )}
                     </article>
@@ -1259,6 +1355,20 @@ function Workspace({ user }: { user: AuthUser | null }) {
       </nav>
 
       <div className={`toast ${toast ? "show" : ""}`} role="status" aria-live="polite">{toast}</div>
+      {slips.length > 0 && createPortal(
+        <div className="slip-sheet">
+          {slips.map((slip) => (
+            <div className="slip" key={slip.username}>
+              <small>Tuklas AR Science Lab{slip.section ? ` - ${slip.section}` : ""}</small>
+              <strong>{slip.name}</strong>
+              <span>Username: <b>{slip.username}</b></span>
+              <span>Password: <b>{slip.password}</b></span>
+              <small>Open {window.location.host} and log in. Keep this slip private.</small>
+            </div>
+          ))}
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

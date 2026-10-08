@@ -1948,3 +1948,57 @@ input[type="range"] {
   font-weight: 800;
   background: #eaf2ff;
 }
+
+/* Printable login slips (Classes > section > Add Whole Class / New Password).
+   Rendered as a sibling of #root and only shown while printSlips() has set body.printing-slips,
+   so a normal Ctrl+P elsewhere still prints the app. */
+.slip-sheet {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+
+  body.printing-slips {
+    padding: 0;
+    background: #fff;
+  }
+
+  body.printing-slips #root {
+    display: none;
+  }
+
+  body.printing-slips .slip-sheet {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    color: #000;
+    font-family: system-ui, sans-serif;
+  }
+}
+
+.slip {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px dashed #888;
+  break-inside: avoid;
+  font-size: 11pt;
+}
+
+.slip strong {
+  font-size: 13pt;
+}
+
+.slip b {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 13pt;
+  letter-spacing: 0.04em;
+}
+
+.slip small {
+  color: #444;
+  font-size: 8.5pt;
+}
