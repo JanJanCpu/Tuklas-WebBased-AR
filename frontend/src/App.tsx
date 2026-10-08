@@ -1163,12 +1163,21 @@ function Workspace({ user }: { user: AuthUser | null }) {
                   showToast("Local cache cleared.");
                 }}>Clear Cache</button></div>
                 <p className="muted">Clears this device's cache only. Already-submitted work stays locked until your teacher resets it.</p>
-                <div className="records-list">
-                  {records.length ? (() => {
-                    // One collapsed row per module (curriculum order) instead of every answer at once.
-                    const order = (id: string) => { const index = modules.findIndex((module) => module.id === id); return index < 0 ? modules.length : index; };
-                    const moduleIds = [...new Set(records.map((record) => record.moduleId))].sort((a, b) => order(a) - order(b));
-                    return moduleIds.map((moduleId) => {
+                {records.length ? (() => {
+                  // One collapsed one-line row per module (curriculum order), all inside a single
+                  // collapsed summary, so a student with every module done still sees one line.
+                  const order = (id: string) => { const index = modules.findIndex((module) => module.id === id); return index < 0 ? modules.length : index; };
+                  const moduleIds = [...new Set(records.map((record) => record.moduleId))].sort((a, b) => order(a) - order(b));
+                  const completedCount = moduleIds.filter((moduleId) => REQUIRED_STAGES.every((stage) => stagesFor(records, moduleId).has(stage))).length;
+                  const unsyncedTotal = records.filter((record) => !record.syncedAt).length;
+                  return (
+                  <details className="saved-all">
+                    <summary className="row-between">
+                      <span><strong>{moduleIds.length} module{moduleIds.length === 1 ? "" : "s"}</strong> · {completedCount} completed{unsyncedTotal ? ` · ${unsyncedTotal} not synced` : ""}</span>
+                      <span className="disclosure-chevron" aria-hidden="true"><ChevronRight size={18} strokeWidth={2.4} /></span>
+                    </summary>
+                    <div className="records-list">
+                    {moduleIds.map((moduleId) => {
                       const moduleRecords = records.filter((record) => record.moduleId === moduleId);
                       const stages = stagesFor(moduleRecords, moduleId);
                       const done = REQUIRED_STAGES.filter((stage) => stages.has(stage)).length;
@@ -1176,11 +1185,9 @@ function Workspace({ user }: { user: AuthUser | null }) {
                       return (
                         <details className="record-card saved-module" key={moduleId}>
                           <summary className="row-between">
-                            <span>
-                              <small className={done === REQUIRED_STAGES.length ? "saved-complete" : ""}>{done === REQUIRED_STAGES.length ? "Completed" : `${done}/${REQUIRED_STAGES.length} stages`}{unsynced ? ` / ${unsynced} not synced` : ""}</small>
-                              <p>{modules.find((module) => module.id === moduleId)?.title ?? moduleRecords[0].module}</p>
-                            </span>
-                            <span className="disclosure-chevron" aria-hidden="true"><ChevronRight size={18} strokeWidth={2.4} /></span>
+                            <span className="saved-title">{modules.find((module) => module.id === moduleId)?.title ?? moduleRecords[0].module}</span>
+                            <span className={`saved-status ${done === REQUIRED_STAGES.length ? "saved-complete" : ""}`}>{done === REQUIRED_STAGES.length ? "Completed" : `${done}/${REQUIRED_STAGES.length}`}{unsynced ? " · not synced" : ""}</span>
+                            <span className="disclosure-chevron" aria-hidden="true"><ChevronRight size={16} strokeWidth={2.4} /></span>
                           </summary>
                           {moduleRecords.map((record) => (
                             <div className="saved-entry" key={record.id}>
@@ -1190,9 +1197,11 @@ function Workspace({ user }: { user: AuthUser | null }) {
                           ))}
                         </details>
                       );
-                    });
-                  })() : <p className="muted">No saved progress on this device yet.</p>}
-                </div>
+                    })}
+                    </div>
+                  </details>
+                  );
+                })() : <p className="muted">No saved progress on this device yet.</p>}
                 <button className="secondary-button" onClick={() => {
                   const blob = new Blob([JSON.stringify(records, null, 2)], { type: "application/json" });
                   const url = URL.createObjectURL(blob);

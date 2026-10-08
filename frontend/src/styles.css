@@ -2025,21 +2025,50 @@ input[type="range"] {
 }
 
 /* Settings > Saved Work: one native <details> per module, collapsed by default. */
+.saved-all > summary,
 .saved-module summary {
   cursor: pointer;
   list-style: none;
 }
 
+.saved-all > summary::-webkit-details-marker,
 .saved-module summary::-webkit-details-marker {
   display: none;
 }
 
-.saved-module summary p {
-  margin: 0;
+.saved-all > summary {
+  padding: 10px 0;
 }
 
+.saved-all[open] > summary {
+  margin-bottom: 8px;
+}
+
+.saved-all[open] > summary .disclosure-chevron,
 .saved-module[open] .disclosure-chevron {
   transform: rotate(90deg);
+}
+
+.saved-module.record-card {
+  padding: 8px 10px;
+}
+
+.saved-module summary {
+  gap: 8px;
+}
+
+.saved-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved-status {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 
 .saved-complete {
