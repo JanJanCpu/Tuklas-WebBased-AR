@@ -767,16 +767,25 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     // The same globe at true radii, small, as the honesty check on the stretched diagram: a badge
     // (a darker ring behind a light fill - the cheapest way to fake a bordered card out of flat 3D
     // geometry) keeps it grounded rather than reading as a sticker dropped on the scene.
-    const miniX = 2.5, miniY = -0.95;
-    const badgeRing = mesh(new THREE.CircleGeometry(0.5, 32), 0xaec4e0, miniX, miniY, -0.2, root, { roughness: 1 });
-    const badgeFill = mesh(new THREE.CircleGeometry(0.45, 32), 0xf5f8fc, miniX, miniY, -0.15, root, { roughness: 1 });
-    const mini = new THREE.Group(); mini.scale.setScalar(0.14); mini.position.set(miniX, miniY, 0.3); mini.rotation.x = 0.32; root.add(mini);
+    const miniX = 2.5, miniY = -0.95, miniZ = 0.3;
+    // The badge sits at exactly the mini globe's position, not behind it: anything nearer the
+    // camera projects further from the view axis, so a badge a few tenths further back drifts
+    // visibly off centre at the edge of frame. Sharing the position removes the parallax, and
+    // drawing the two circles first with no depth test keeps them behind the globe anyway.
+    const badge = (radius: number, color: number, order: number) => {
+      const disc = mesh(new THREE.CircleGeometry(radius, 32), color, miniX, miniY, miniZ, root, { roughness: 1 });
+      disc.material.depthTest = false; disc.material.depthWrite = false; disc.renderOrder = order;
+      return disc;
+    };
+    const badgeRing = badge(0.5, 0xaec4e0, -2);
+    const badgeFill = badge(0.45, 0xf5f8fc, -1);
+    const mini = new THREE.Group(); mini.scale.setScalar(0.14); mini.position.set(miniX, miniY, miniZ); mini.rotation.x = 0.32; root.add(mini);
     globe.children.forEach(child => mini.add(child.clone()));
     mini.children.forEach(child => {
       child.visible = child.name === "layer";
       if ((child as THREE.Mesh).isMesh) registry.push(child as THREE.Mesh);
     });
-    const miniLabel = label("To scale", miniX, miniY - 0.62, 0.95, root, 4);
+    const miniLabel = label("To scale", miniX, miniY - 0.62, 0.95, root, 4); miniLabel.sprite.position.z = miniZ;
     interact = {
       targets: { ...Object.fromEntries(diagram.faces.map((pair, index) => [`band${index}`, pair[0]])), ...Object.fromEntries(chips.map((chip, order) => [`chip${order}`, chip])) },
       down: (name, point) => { if (name.startsWith("chip")) { heldChip.index = Number(name.slice(4)); heldChip.x = point.x; heldChip.y = point.y; } },
