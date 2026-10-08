@@ -176,7 +176,7 @@ Was an experimental MediaPipe Hand Landmarker spike (`lib/handTracking.ts`, `?ha
 
 ### Measured performance
 - Marker tracking (AR.js) is the frame-rate ceiling on weak phones, not rendering.
-- Redmi A3: about 10 fps at 640x480 every frame; about 20 with every-2nd-frame; after quality tuning all scenes 17-21 fps. With 320x240 tracking (`?q=2`, readout `q2 d2 t320`), 1.1 Inertia with the marker steady: 22-25 fps, mean 23.7 over 30 s (b38, 2026-10-09, phone charging at 32-38 C). About the 24 fps target, not consistently above it.
+- Redmi A3: about 10 fps at 640x480 every frame; about 20 with every-2nd-frame; after quality tuning all scenes 17-21 fps. With 320x240 tracking (`?q=2`, readout `q2 d2 t320`), 1.1 Inertia with the marker steady: 22-25 fps, mean 23.7 over 30 s (b38, 2026-10-09, phone charging at 32-38 C). About the 24 fps target, not consistently above it. Same session on b40 at 32 C: forced `q0` 10-11 fps (mean 10.9); fresh start with no saved level and no `?q` (what a student gets) stepped q0 -> q1 within about 4 s and then held `q1` at 18-21 fps (mean 19.8 over 54 s). It never reaches q2 on its own because q1 sits just above the 19 fps step-down threshold.
 - Poco C65: 22-25 fps at room temperature (older build). Cold phones behave differently; test at room temperature. Re-measured 2026-10-09 on b40, 1.1 Inertia, marker steady, 30 s at 2 s samples, battery 12% and charging at 37-38 C: `q2` 50-60 fps (mean 54.9); `q0` 17-40 fps (mean 29.3), sliding from about 36 to about 20 as it warmed, so likely throttled - re-test q0 on a charged, cool phone before quoting it. Earth 2.2 and circuit gestures also passed on it.
 - iPhone 16 Plus: 60 fps (the thesis originally mis-stated 23; corrected in B.9-B.11 and Table 4.3).
 - Target: 24 fps.
