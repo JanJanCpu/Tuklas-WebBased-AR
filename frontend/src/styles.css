@@ -1707,6 +1707,28 @@ input[type="range"] {
   }
 }
 
+/* Laptop / projector (panel demo): wider column, larger text, bigger AR viewport.
+   Phone-first layout is unchanged; every font-size is rem, so the root bump scales all text. */
+@media (min-width: 1200px) and (min-height: 700px) {
+  html {
+    font-size: 17px;
+  }
+
+  .screen-stack {
+    width: min(960px, 100%);
+  }
+
+  .app-header,
+  .bottom-nav {
+    right: calc((100vw - 960px) / 2);
+    left: calc((100vw - 960px) / 2);
+  }
+
+  .ar-frame-sticky {
+    max-width: 620px;
+  }
+}
+
 @media (max-width: 390px) {
   .app-header {
     grid-template-columns: 34px 1fr auto;
