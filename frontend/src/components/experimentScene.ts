@@ -719,11 +719,11 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     const caption = label("", 0, 2.65, 5.4);
     // The five layers waiting to be built, center first. Drag one onto the globe, or tap it.
     // Placed ones stay in the row and become the finished globe's colour legend.
-    const chipHomes = buildOrder.map((_, order) => new THREE.Vector3(-2.4 + order * 1.2, -2.3, 0.2));
+    const chipHomes = buildOrder.map((_, order) => new THREE.Vector3(-2.9 + order * 1.45, -2.3, 0.2));
     const chips = buildOrder.map((layerIndex, order) => {
       const chip = new THREE.Group(); chip.position.copy(chipHomes[order]); root.add(chip);
       mesh(new THREE.SphereGeometry(0.26, 20, 14), earthLayers[layerIndex].color, 0, 0, 0, chip, { roughness: 0.4 });
-      label(earthLayers[layerIndex].name, 0, -0.5, 1.02, chip, 4);
+      label(earthLayers[layerIndex].name, 0, -0.54, 1.38, chip, 4);
       return chip;
     });
     const feedback = { text: "", until: 0 };
@@ -758,16 +758,16 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       const [inner, outer] = shownRadii(index);
       const m = side > 0 ? (inner + outer) / 2 : DR * 0.99;
       line([[side * m * Math.cos(t), m * Math.sin(t), 0.05], [side * (DR + 0.55), labelY, 0.05]], 0x8aa2bb, annot);
-      label(earthLayers[index].name, side * (DR + 1.18), labelY, 1.16, annot, 4);
+      label(earthLayers[index].name, side * (DR + 1.35), labelY, 1.5, annot, 4);
     };
     ([[0, 1.05, 1.52], [3, 0.62, 0.88], [4, 0.2, 0.24], [5, -0.3, -0.4], [6, -0.85, -1.04]] as [number, number, number][]).forEach(([index, t, y]) => leader(index, t, y, 1));
     leader(1, 0.95, 1.25, -1); leader(2, 0.4, 0.45, -1);
-    label("Left: what it is made of · Right: how it behaves", 0, -2.35, 4.8, detail, 12);
-    label("Not to scale · tap a layer to select it", 0, -2.68, 3.4, detail, 10);
+    label("Left: what it is made of · Right: how it behaves", 0, -2.4, 5.8, detail, 12);
+    label("Not to scale · tap a layer to select it", 0, -2.85, 4.4, detail, 10);
     // The same globe at true radii, small, as the honesty check on the stretched diagram: a badge
     // (a darker ring behind a light fill - the cheapest way to fake a bordered card out of flat 3D
     // geometry) keeps it grounded rather than reading as a sticker dropped on the scene.
-    const miniX = 2.5, miniY = -0.95, miniZ = 0.3;
+    const miniX = 2.55, miniY = -0.7, miniZ = 0.3;
     // The badge sits at exactly the mini globe's position, not behind it: anything nearer the
     // camera projects further from the view axis, so a badge a few tenths further back drifts
     // visibly off centre at the edge of frame. Sharing the position removes the parallax, and
@@ -785,7 +785,7 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       child.visible = child.name === "layer";
       if ((child as THREE.Mesh).isMesh) registry.push(child as THREE.Mesh);
     });
-    const miniLabel = label("To scale", miniX, miniY - 0.62, 0.95, root, 4); miniLabel.sprite.position.z = miniZ;
+    const miniLabel = label("To scale", miniX, miniY - 0.68, 1.25, root, 4); miniLabel.sprite.position.z = miniZ;
     interact = {
       targets: { ...Object.fromEntries(diagram.faces.map((pair, index) => [`band${index}`, pair[0]])), ...Object.fromEntries(chips.map((chip, order) => [`chip${order}`, chip])) },
       down: (name, point) => { if (name.startsWith("chip")) { heldChip.index = Number(name.slice(4)); heldChip.x = point.x; heldChip.y = point.y; } },
