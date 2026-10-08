@@ -1164,7 +1164,34 @@ function Workspace({ user }: { user: AuthUser | null }) {
                 }}>Clear Cache</button></div>
                 <p className="muted">Clears this device's cache only. Already-submitted work stays locked until your teacher resets it.</p>
                 <div className="records-list">
-                  {records.length ? records.slice().reverse().map((record) => <article className="record-card" key={record.id}><small>{record.role} / {record.module} / {record.stage} / {new Date(record.createdAt).toLocaleString()} {record.syncedAt ? "/ synced" : "/ offline"}</small><p>{record.text}</p></article>) : <p className="muted">No saved progress on this device yet.</p>}
+                  {records.length ? (() => {
+                    // One collapsed row per module (curriculum order) instead of every answer at once.
+                    const order = (id: string) => { const index = modules.findIndex((module) => module.id === id); return index < 0 ? modules.length : index; };
+                    const moduleIds = [...new Set(records.map((record) => record.moduleId))].sort((a, b) => order(a) - order(b));
+                    return moduleIds.map((moduleId) => {
+                      const moduleRecords = records.filter((record) => record.moduleId === moduleId);
+                      const stages = stagesFor(moduleRecords, moduleId);
+                      const done = REQUIRED_STAGES.filter((stage) => stages.has(stage)).length;
+                      const unsynced = moduleRecords.filter((record) => !record.syncedAt).length;
+                      return (
+                        <details className="record-card saved-module" key={moduleId}>
+                          <summary className="row-between">
+                            <span>
+                              <small className={done === REQUIRED_STAGES.length ? "saved-complete" : ""}>{done === REQUIRED_STAGES.length ? "Completed" : `${done}/${REQUIRED_STAGES.length} stages`}{unsynced ? ` / ${unsynced} not synced` : ""}</small>
+                              <p>{modules.find((module) => module.id === moduleId)?.title ?? moduleRecords[0].module}</p>
+                            </span>
+                            <span className="disclosure-chevron" aria-hidden="true"><ChevronRight size={18} strokeWidth={2.4} /></span>
+                          </summary>
+                          {moduleRecords.map((record) => (
+                            <div className="saved-entry" key={record.id}>
+                              <small>{record.stage} / {new Date(record.createdAt).toLocaleString()} / {record.syncedAt ? "synced" : "offline"}</small>
+                              <p>{record.text}</p>
+                            </div>
+                          ))}
+                        </details>
+                      );
+                    });
+                  })() : <p className="muted">No saved progress on this device yet.</p>}
                 </div>
                 <button className="secondary-button" onClick={() => {
                   const blob = new Blob([JSON.stringify(records, null, 2)], { type: "application/json" });

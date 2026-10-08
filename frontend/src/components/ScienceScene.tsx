@@ -236,7 +236,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
       if (now - statsAt >= 1000) {
         renderFps = Math.round(frames * 1000 / (now - statsAt));
         frames = 0; statsAt = now;
-        if (fpsText) fpsText.textContent = `render ${renderFps} fps | q${quality} d${detectEvery} t${trackingSize.w}${emptyScene ? " empty" : ""} | b36`;
+        if (fpsText) fpsText.textContent = `render ${renderFps} fps | q${quality} d${detectEvery} t${trackingSize.w}${emptyScene ? " empty" : ""} | b37`;
       }
     };
 

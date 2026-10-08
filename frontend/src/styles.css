@@ -2023,3 +2023,36 @@ input[type="range"] {
   gap: 6px;
   text-decoration: none;
 }
+
+/* Settings > Saved Work: one native <details> per module, collapsed by default. */
+.saved-module summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.saved-module summary::-webkit-details-marker {
+  display: none;
+}
+
+.saved-module summary p {
+  margin: 0;
+}
+
+.saved-module[open] .disclosure-chevron {
+  transform: rotate(90deg);
+}
+
+.saved-complete {
+  color: #1d7a46;
+  font-weight: 800;
+}
+
+.saved-entry {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.saved-entry p {
+  margin: 4px 0 0;
+}
