@@ -690,27 +690,30 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     // on the finished globe rather than steps you build. Named, not index-matched, because the
     // mini copy below has to know which clones to hide and index math broke when a layer was added.
     const isOverlay = (index: number) => index === 1 || index === 2;
-    const shells = earthLayers.map((layer, index) => {
-      const shell = new THREE.Mesh(new THREE.SphereGeometry(layer.outer * scale, 56, 40, phiStart, phiLength), new THREE.MeshStandardMaterial({ color: index === 0 ? 0xffffff : layer.color, map: index === 0 ? surface : null, roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide }));
-      shell.name = isOverlay(index) ? "overlay" : "layer";
-      registry.push(shell); globe.add(shell); return shell;
-    });
-    // Flat cut faces: a full ring per layer on each of the two cut planes. The wedge
-    // removed runs pole to pole, so each meridian plane exposes the sphere's complete
-    // circular cross-section at that layer's radius - a half ring (as this used to read)
-    // only draws a semicircle. Visually near-identical to a full ring from the default
-    // camera angle (the far half sits where the sphere's own bulk already occludes it),
-    // but it's the geometrically correct cross-section and matters once the wedge isn't
-    // centered on the camera - see wedgeCenter below, the actual fix for the heart/apple
-    // silhouette this view used to have.
+    // Flat cut faces are full rings: the wedge removed runs pole to pole, so each meridian
+    // plane exposes the sphere's complete circular cross-section at that layer's radius.
     const cutAngles = [wedgeCenter - cut / 2, wedgeCenter + cut / 2];
-    const faces = earthLayers.map((layer, index) => cutAngles.map(angle => {
-      const face = mesh(new THREE.RingGeometry(layer.inner * scale, layer.outer * scale, 56), layer.color, 0, 0, 0, globe, { roughness: 0.55, emissive: index >= 5 ? layer.color : undefined, emissiveIntensity: 0.22 });
-      face.rotation.y = Math.PI + angle;
-      face.name = isOverlay(index) ? "overlay" : "layer";
-      if (isOverlay(index)) { face.material.polygonOffset = true; face.material.polygonOffsetFactor = -2; face.material.polygonOffsetUnits = -2; }
-      return face;
-    }));
+    // One cutaway globe. Built twice: at true radii here, and with the thin outer layers
+    // exaggerated for the labelled view below - the only honest way to show a 35 km crust
+    // beside a 2,231 km lower mantle, which is why textbook diagrams carry both.
+    const cutaway = (parent: THREE.Object3D, radii: (index: number) => [number, number], textured: boolean) => {
+      const shells = earthLayers.map((layer, index) => {
+        const painted = textured && index === 0;
+        const shell = new THREE.Mesh(new THREE.SphereGeometry(radii(index)[1], 56, 40, phiStart, phiLength), new THREE.MeshStandardMaterial({ color: painted ? 0xffffff : layer.color, map: painted ? surface : null, roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide }));
+        shell.name = isOverlay(index) ? "overlay" : "layer";
+        registry.push(shell); parent.add(shell); return shell;
+      });
+      const faces = earthLayers.map((layer, index) => cutAngles.map(angle => {
+        const [inner, outer] = radii(index);
+        const face = mesh(new THREE.RingGeometry(inner, outer, 56), layer.color, 0, 0, 0, parent, { roughness: 0.55, emissive: index >= 5 ? layer.color : undefined, emissiveIntensity: 0.22 });
+        face.rotation.y = Math.PI + angle;
+        face.name = isOverlay(index) ? "overlay" : "layer";
+        if (isOverlay(index)) { face.material.polygonOffset = true; face.material.polygonOffsetFactor = -2; face.material.polygonOffsetUnits = -2; }
+        return face;
+      }));
+      return { shells, faces };
+    };
+    const { shells, faces } = cutaway(globe, index => [earthLayers[index].inner * scale, earthLayers[index].outer * scale], true);
     const ghost = mesh(new THREE.SphereGeometry(R, 32, 22, phiStart, phiLength), 0x4a78a8, 0, 0, 0, globe, { opacity: 0.55, roughness: 0.4 }); ghost.material.wireframe = true; ghost.name = "ghost";
     const air = mesh(new THREE.SphereGeometry(R * 1.06, 40, 28), 0x6fb7ff, 0, 0, 0, globe, { opacity: 0.22, emissive: 0x3d8bff, emissiveIntensity: 0.5 }); air.material.side = THREE.BackSide;
     const caption = label("", 0, 2.65, 5.4);
@@ -734,61 +737,37 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       feedback.until = sceneTime + 2.2;
     };
 
-    // Surface-detail view: a 3D slab of the top 350 km with rock textures, depth tags, and brackets for the two ways of naming layers.
-    // Scaled to 0.9 so this view occupies roughly the same box as the globe view. The camera
-    // frames the union of both views (see sceneBounds in ScienceScene), so a detail view that
-    // sprawls wider than the globe pushes the globe off-centre and shrinks it on the other screen.
-    const detail = new THREE.Group(); detail.rotation.x = 0.28; detail.scale.setScalar(0.9); root.add(detail);
-    const rock = (baseColor: string, accent: string, kind: "grain" | "flow", seedStart: number) => {
-      const canvas = document.createElement("canvas"); canvas.width = 256; canvas.height = 128;
-      const g = canvas.getContext("2d")!; g.fillStyle = baseColor; g.fillRect(0, 0, 256, 128);
-      let seedValue = seedStart; const rnd = () => (seedValue = (seedValue * 16807 + 11) % 2147483647) / 2147483647;
-      g.fillStyle = accent; g.strokeStyle = accent;
-      if (kind === "grain") for (let k = 0; k < 150; k++) { g.globalAlpha = 0.22 + rnd() * 0.35; g.fillRect(rnd() * 256, rnd() * 128, 3 + rnd() * 9, 2 + rnd() * 5); }
-      else for (let row = 0; row < 12; row++) { g.globalAlpha = 0.3; g.lineWidth = 6; g.beginPath(); const y0 = row * 11 + 4; for (let x = 0; x <= 256; x += 8) { const y = y0 + Math.sin(x / 256 * Math.PI * 4 + row) * 6; if (x) g.lineTo(x, y); else g.moveTo(x, y); } g.stroke(); }
-      g.globalAlpha = 1;
-      const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace; texture.wrapS = THREE.RepeatWrapping; return texture;
+    // Labelled view. At true radii the crust is 35 km out of 6,371 - far under a pixel - so this
+    // is the same cutaway with depth remapped by `drawn`: the outer few hundred kilometres are
+    // stretched and the deep layers compressed. That is what every textbook cross-section does,
+    // and why it has to sit beside a to-scale globe to stay honest about the real proportions.
+    const detail = new THREE.Group(); detail.rotation.x = 0.3; detail.position.set(-0.1, 0.3, 0); root.add(detail);
+    const DR = 1.45;
+    const stops: [number, number][] = [[0, 1], [35, 0.95], [100, 0.92], [350, 0.86], [660, 0.78], [2891, 0.48], [5150, 0.22], [6371, 0]];
+    const drawn = (depth: number) => {
+      for (let k = 1; k < stops.length; k++) if (depth <= stops[k][0]) { const [d0, r0] = stops[k - 1]; const [d1, r1] = stops[k]; return (r0 + (r1 - r0) * (depth - d0) / (d1 - d0)) * DR; }
+      return 0;
     };
-    const H = 3.0 / 350; const SLAB_W = 2.0; const SLAB_D = 1.0; const surfaceY = 1.35;
-    const spans = [[0, 35], [35, 100], [100, 350]];
-    const textures = [rock("#4a8a58", "#24512f", "grain", 3), rock("#35b0aa", "#d5fff8", "grain", 7), rock("#b060c4", "#ffd6ff", "flow", 9)];
-    const blocks = spans.map(([from, to], i) => {
-      const block = mesh(new THREE.BoxGeometry(SLAB_W, (to - from) * H, SLAB_D), 0xffffff, 0, surfaceY - (from + (to - from) / 2) * H, 0, detail, { roughness: 0.85 });
-      block.material.map = textures[i]; return block;
-    });
-    // Ground on top: grass, a mountain with a snow cap, and a few trees.
-    mesh(new THREE.BoxGeometry(SLAB_W, 0.05, SLAB_D), 0x5fae4e, 0, surfaceY + 0.025, 0, detail, { roughness: 0.8 });
-    mesh(new THREE.ConeGeometry(0.34, 0.55, 6), 0x8b8f96, 0.45, surfaceY + 0.33, -0.1, detail, { roughness: 0.9 });
-    mesh(new THREE.ConeGeometry(0.13, 0.17, 6), 0xf4f7fa, 0.45, surfaceY + 0.52, -0.1, detail, { roughness: 0.6 });
-    [[-0.6, 0.15], [-0.35, -0.2], [-0.75, -0.25], [-0.2, 0.25]].forEach(([x, z]) => mesh(new THREE.ConeGeometry(0.1, 0.26, 7), 0x2f7d3c, x, surfaceY + 0.18, z, detail, { roughness: 0.8 }));
-    // Brackets: on the left what the rock is made of, on the right how it behaves.
-    const bracket = (from: number, to: number, x: number, text: string, side: 1 | -1) => {
-      const top = surfaceY - from * H; const bottom = surfaceY - to * H;
-      const finish = { metalness: 0.5, roughness: 0.4 };
-      mesh(new THREE.BoxGeometry(0.05, top - bottom, 0.05), 0xdde6ef, x, (top + bottom) / 2, 0.5, detail, finish);
-      [top, bottom].forEach(y => mesh(new THREE.BoxGeometry(0.2, 0.04, 0.05), 0xdde6ef, x - side * 0.08, y, 0.5, detail, finish));
-      label(text, x + side * 0.85, (top + bottom) / 2, 1.5, detail, 4);
+    const shownRadii = (index: number): [number, number] => [drawn(6371 - earthLayers[index].inner), drawn(6371 - earthLayers[index].outer)];
+    const diagram = cutaway(detail, shownRadii, true);
+    // Leader lines live in the plane of the visible cut face, so a line from a band's mid-radius
+    // out to the margin stays on the face instead of floating in front of the globe. Overlays are
+    // anchored at the rim instead: their own radii fall on the half of the face the sphere hides.
+    const annot = new THREE.Group(); annot.rotation.y = Math.PI + cutAngles[0]; detail.add(annot);
+    const leader = (index: number, t: number, labelY: number, side: 1 | -1) => {
+      const [inner, outer] = shownRadii(index);
+      const m = side > 0 ? (inner + outer) / 2 : DR * 0.99;
+      line([[side * m * Math.cos(t), m * Math.sin(t), 0.05], [side * (DR + 0.55), labelY, 0.05]], 0x8aa2bb, annot);
+      label(earthLayers[index].name, side * (DR + 1.18), labelY, 1.16, annot, 4);
     };
-    bracket(0, 35, -1.3, "Crust", -1); bracket(35, 432, -1.3, "Upper mantle to 660 km", -1);
-    bracket(0, 100, 1.3, "Lithosphere", 1); bracket(100, 350, 1.3, "Asthenosphere", 1);
-    [35, 100, 350].forEach(depth => { const tag = label(`${depth} km`, 0.62, surfaceY - depth * H, 0.85, detail, 4); tag.sprite.position.z = 0.55; });
-    // Below the asthenosphere the mantle carries on: fade the slab out into orange mantle instead of ending in a hard edge.
-    const fadeCanvas = document.createElement("canvas"); fadeCanvas.width = 4; fadeCanvas.height = 64;
-    const fadeCtx = fadeCanvas.getContext("2d")!; const fadeGradient = fadeCtx.createLinearGradient(0, 0, 0, 64);
-    fadeGradient.addColorStop(0, "rgba(229,139,53,1)"); fadeGradient.addColorStop(1, "rgba(229,139,53,0)");
-    fadeCtx.fillStyle = fadeGradient; fadeCtx.fillRect(0, 0, 4, 64);
-    const fadeTexture = new THREE.CanvasTexture(fadeCanvas); fadeTexture.colorSpace = THREE.SRGBColorSpace;
-    const mantleFade = mesh(new THREE.BoxGeometry(SLAB_W, 0.7, SLAB_D), 0xffffff, 0, surfaceY - 3.0 - 0.35, 0, detail, { roughness: 0.8 });
-    mantleFade.material.map = fadeTexture; mantleFade.material.transparent = true; mantleFade.material.depthWrite = false;
-    label("Left: what it is made of · Right: how it behaves", 0, -2.68, 5.2, detail, 12);
-    label("Tap a layer to select it", 0, -3.05, 3.2, detail, 10);
-    // A small copy of the same globe (shared geometry and materials) shows where the magnified
-    // slab comes from: a badge (a darker ring behind a light fill - the cheapest way to fake a
-    // bordered card with flat 3D geometry) with a red marker on the surface and one leader line
-    // down to the top of the slab. The line has to end on the slab's *ground* line, not above it:
-    // `detail` is tilted (rotation.x) while the line is not, so the slab's apparent top sits lower
-    // than its untilted y - aiming at the raw y made the line point past the mountain into empty sky.
-    const miniX = 2.45, miniY = 1.72;
+    ([[0, 1.05, 1.52], [3, 0.62, 0.88], [4, 0.2, 0.24], [5, -0.3, -0.4], [6, -0.85, -1.04]] as [number, number, number][]).forEach(([index, t, y]) => leader(index, t, y, 1));
+    leader(1, 0.95, 1.25, -1); leader(2, 0.4, 0.45, -1);
+    label("Left: what it is made of · Right: how it behaves", 0, -2.35, 4.8, detail, 12);
+    label("Not to scale · tap a layer to select it", 0, -2.68, 3.4, detail, 10);
+    // The same globe at true radii, small, as the honesty check on the stretched diagram: a badge
+    // (a darker ring behind a light fill - the cheapest way to fake a bordered card out of flat 3D
+    // geometry) keeps it grounded rather than reading as a sticker dropped on the scene.
+    const miniX = 2.5, miniY = -0.95;
     const badgeRing = mesh(new THREE.CircleGeometry(0.5, 32), 0xaec4e0, miniX, miniY, -0.2, root, { roughness: 1 });
     const badgeFill = mesh(new THREE.CircleGeometry(0.45, 32), 0xf5f8fc, miniX, miniY, -0.15, root, { roughness: 1 });
     const mini = new THREE.Group(); mini.scale.setScalar(0.14); mini.position.set(miniX, miniY, 0.3); mini.rotation.x = 0.32; root.add(mini);
@@ -797,29 +776,26 @@ export function createExperimentScene(root: THREE.Group, id: string) {
       child.visible = child.name === "layer";
       if ((child as THREE.Mesh).isMesh) registry.push(child as THREE.Mesh);
     });
-    mesh(new THREE.SphereGeometry(0.16, 10, 8), 0xff4d4d, 0, R, 0, mini, { emissive: 0xff2222, emissiveIntensity: 0.9 });
-    const zoomLine = line([[miniX - 0.42, miniY - 0.17, 0.3], [0.88, 1.12, 0.3]], 0xff4d4d);
+    const miniLabel = label("To scale", miniX, miniY - 0.62, 0.95, root, 4);
     interact = {
-      targets: { crust: blocks[0], upper: blocks[1], soft: blocks[2], ...Object.fromEntries(chips.map((chip, order) => [`chip${order}`, chip])) },
+      targets: { ...Object.fromEntries(diagram.faces.map((pair, index) => [`band${index}`, pair[0]])), ...Object.fromEntries(chips.map((chip, order) => [`chip${order}`, chip])) },
       down: (name, point) => { if (name.startsWith("chip")) { heldChip.index = Number(name.slice(4)); heldChip.x = point.x; heldChip.y = point.y; } },
       move: (name, point) => { if (name.startsWith("chip")) { heldChip.x = point.x; heldChip.y = point.y; } },
       up: (name, point, moved, api) => {
         if (name.startsWith("chip")) { if (moved < 8 || Math.hypot(point.x, point.y) < 2.0) tryPlace(Number(name.slice(4)), api); heldChip.index = -1; }
-        else if (moved < 8) api.setControl("b", name === "crust" ? 0 : name === "upper" ? 1 : 2);
+        else if (moved < 8 && name.startsWith("band")) api.setControl("b", Number(name.slice(4)));
       },
       cancel: () => { heldChip.index = -1; },
     };
     updates.push((time, a, b, lab) => {
       globe.visible = !a; detail.visible = Boolean(a);
-      textures[2].offset.x = (time * 0.05) % 1;
-      mini.visible = Boolean(a); zoomLine.visible = Boolean(a); badgeRing.visible = Boolean(a); badgeFill.visible = Boolean(a); mini.rotation.y = Math.sin(time * 0.45) * 0.28;
+      mini.visible = Boolean(a); miniLabel.sprite.visible = Boolean(a); badgeRing.visible = Boolean(a); badgeFill.visible = Boolean(a); mini.rotation.y = Math.sin(time * 0.45) * 0.28;
       sceneTime = time;
       chips.forEach((chip, order) => {
         chip.visible = !a;
         if (heldChip.index === order) chip.position.set(heldChip.x, heldChip.y, 0.3); else chip.position.lerp(chipHomes[order], 0.25);
         chip.scale.setScalar(order === lab.layers ? 1 + 0.08 * Math.sin(time * 4) : 0.9);
       });
-      blocks.forEach((block, i) => { const on = b === 0 ? i === 0 : b === 1 ? i <= 1 : b === 2 ? i === 2 : false; block.material.emissive.setHex(on ? [0x4a8a58, 0x35b0aa, 0xb060c4][i] : 0); block.material.emissiveIntensity = on ? 0.45 + 0.25 * Math.sin(time * 3) : 0; });
       globe.rotation.y = Math.sin(time * 0.45) * 0.28;
       const complete = lab.layers === buildOrder.length;
       air.visible = complete; ghost.visible = !complete;
@@ -827,12 +803,21 @@ export function createExperimentScene(root: THREE.Group, id: string) {
         const order = buildOrder.indexOf(i);
         const built = order >= 0 && order < lab.layers;
         shells[i].visible = built;
-        const overlay = i === 1 || i === 2;
+        const overlay = isOverlay(i);
         const selected = i === b;
+        const glowHex = selected ? 0x554422 : i >= 5 ? earthLayers[i].color : 0;
+        const glowStrength = selected ? 0.7 + 0.5 * Math.sin(time * 3) : 0.22;
         faces[i].forEach(face => {
           face.visible = overlay ? complete && selected : built;
-          face.material.emissive.setHex(selected ? 0x554422 : i >= 5 ? earthLayers[i].color : 0);
-          face.material.emissiveIntensity = selected ? 0.7 + 0.5 * Math.sin(time * 3) : 0.22;
+          face.material.emissive.setHex(glowHex);
+          face.material.emissiveIntensity = glowStrength;
+        });
+        // The labelled diagram is always fully built; only the two overlays wait to be selected.
+        diagram.shells[i].visible = !overlay;
+        diagram.faces[i].forEach(face => {
+          face.visible = !overlay || selected;
+          face.material.emissive.setHex(glowHex);
+          face.material.emissiveIntensity = glowStrength;
         });
       });
       caption.set(!a && time < feedback.until ? feedback.text : lab.layers === 0 && !a ? "Drag the Inner core onto the globe to start" : lab.layers < buildOrder.length && !a ? "Now add the next layer, working outward" : `${earthLayers[b].name}: ${earthLayers[b].depth}`);
