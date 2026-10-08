@@ -12,12 +12,11 @@ Capstone: "Development of an Offline Augmented Reality Science Laboratory Simula
 
 This is **pre-defense**, in a dedicated polish window before the panel and before school testing:
 1. Thesis audit against the code, research instruments, and Chapter 4/5 drafted from real data only are done. Never fabricate results, scores or logs; every number in the thesis comes from the real pilot data.
-2. **Now (through the polish window):** the adviser/panel wants the AR more dynamic ("Pokemon GO level", less flat and static, replacing physical lab objects, hand/touch manipulation) and the general app UI polished, before the upgraded build is used for real SOP1/2/3 testing at Antonio A. Maceda Integrated School (letters 1/2/6 are for arranging that testing) and before the October defense. All of this lives on the fork branch `feature/dynamic-ar`. Latest build label: **b39**.
+2. **Now (through the polish window):** the adviser/panel wants the AR more dynamic ("Pokemon GO level", less flat and static, replacing physical lab objects, hand/touch manipulation) and the general app UI polished, before the upgraded build is used for real SOP1/2/3 testing at Antonio A. Maceda Integrated School (letters 1/2/6 are for arranging that testing) and before the October defense. All of this lives on the fork branch `feature/dynamic-ar`. Latest build label: **b40**.
 3. **After school testing, before the defense:** the real data from that testing (curriculum validation, pretest/posttest, SUS) needs to go into Chapter 4/5 and the appendices, replacing/extending whatever pilot data is there now.
 
 Open items:
-- Phone test of Redmi A3 with `?fps=1&q=2` (expect readout `q2 d2 t320`): does 320x240 tracking reach 24+ fps with a steady marker?
-- Is the Earth (2.2) mini-globe legible on a phone? Do the circuit gestures feel right?
+- Done 2026-10-09 over USB (see Measured performance): Redmi A3 fps at q2, Earth 2.2 legibility (labels enlarged, b39), circuit gestures (small-target tap fix, b40). Still open from that session: the account features end to end on a phone (bulk add, slips, New Password, SMS/Email).
 - Permanent CORS wildcard for `tuklas-web-based-ar-frontend-*-tuklasar.vercel.app` was offered, not applied (would need code, since the allowlist is exact-match).
 - Optional: open-source 3D models; a PR back to the friend's repo once devices are re-tested.
 - If the upgraded build is reported in the thesis or paper, re-measure Redmi A3 / Poco C65 (see the fps table below).
@@ -32,6 +31,9 @@ The original repo (`earldulay/Tuklas-WebBased-AR`) and its frontend Vercel proje
 
 ### Adding a CORS origin
 `CLIENT_ORIGIN` is a comma-separated, exact-match allowlist stored as a hidden Vercel secret (cannot be read back). To add one, replace the whole value: `vercel env rm CLIENT_ORIGIN production --scope tuklasar` then `vercel env add CLIENT_ORIGIN production --scope tuklasar` with the full list (friend's URL, `-nine`, feature-branch alias, `http://localhost:5173`, plus the new one), redeploy the backend, then verify: `curl -i -X OPTIONS https://tuklas-backend-two.vercel.app/api/auth/login -H "Origin: <url>" -H "Access-Control-Request-Method: POST"` and look for `access-control-allow-origin`.
+
+### Phone testing over USB (no Vercel login)
+Vercel SSO on preview URLs can block phone testing. Instead: `VITE_API_URL=https://tuklas-backend-two.vercel.app/api npx vite build` in `frontend`, then `npx vite preview --host 127.0.0.1 --port 5173 --strictPort` (IPv4 matters: `adb reverse` connects to 127.0.0.1 and Vite otherwise binds only `::1`), then `adb reverse tcp:5173 tcp:5173` and open `http://localhost:5173/?fps=1&q=2` on the phone (localhost is in the CORS allowlist and counts as a secure context for the camera). `adb forward tcp:9222 localabstract:chrome_devtools_remote` gives CDP into phone Chrome; `adb shell input tap/swipe` sends real touches. adb is at `%LOCALAPPDATA%/Android/Sdk/platform-tools`.
 
 ## Commands
 
@@ -161,20 +163,20 @@ Per-module content and gestures:
 - **mutation**: two helices sharing one x scale (original above, edited below) with codon bands and a protein bead chain under each (edited beads turn orange where the amino acid changed, red for STOP). Each original base keeps its own piece, so an insertion or deletion slides every later base along and the codons regroup; the removed base lifts out, the changed/added base glows. Tap a base, or slide a finger along the original row, to pick `Base position` (caret marks it); tap the chip under the scene to cycle the mutation type.
 
 ### `ScienceScene.tsx`
-Three.js 0.164.1 + AR.js scene. Studio environment lighting + ACES tone mapping. Generic pointer input: pointer raycast to the scene's table plane, `touch-action: pan-y` plus a touchmove `preventDefault` only while grabbing (so scrolling still works, and dragging is not cancelled by scroll on phones), relative pull from the grab point. Camera framing (`sceneBounds`, `frameScene`) fits measured bounds over sampled times and both extremes of control A. `viewMode "fallback"` (3D mode) uses a LIGHT background (`.ar-frame.fallback-mode`).
+Three.js 0.164.1 + AR.js scene. Studio environment lighting + ACES tone mapping. Generic pointer input: pointer raycast to the scene's table plane, `touch-action: pan-y` plus a touchmove `preventDefault` only while grabbing (so scrolling still works, and dragging is not cancelled by scroll on phones), relative pull from the grab point. A tap that misses every part falls back to the nearest target whose screen footprint is under 44 CSS px, grown to 44 px (`nearestSmall`): on a phone a battery cell or lever projects to about 7 px and was nearly impossible to hit (found 2026-10-09 by adb taps on the Redmi A3). Camera framing (`sceneBounds`, `frameScene`) fits measured bounds over sampled times and both extremes of control A. `viewMode "fallback"` (3D mode) uses a LIGHT background (`.ar-frame.fallback-mode`).
 
 ### Quality levels (0-3) and diagnostics
 Auto step-down when fps stays under 19, persisted in `localStorage` as `tuklas-quality-v2`:
 - 0 full; 1 marker detection every 2nd frame; 2 pixelRatio 1 + 320x240 tracking canvas (`trackingSize`, `trackingLow` state); 3 Lambert (cheaper) shading.
 
-URL parameters: `?fps=1` (HUD: `render N fps | qN dN tNNN[ empty] | bNN`), `?q=<0-3>` force a level, `?detect=<n>` detect every n frames, `?empty=1` empty scene (isolates tracking cost). The HUD build label (currently `b39`, a string in `ScienceScene.tsx`) is how you confirm a phone loaded the new build; bump it on every change you want to verify remotely.
+URL parameters: `?fps=1` (HUD: `render N fps | qN dN tNNN[ empty] | bNN`), `?q=<0-3>` force a level, `?detect=<n>` detect every n frames, `?empty=1` empty scene (isolates tracking cost). The HUD build label (currently `b40`, a string in `ScienceScene.tsx`) is how you confirm a phone loaded the new build; bump it on every change you want to verify remotely.
 
 ### Hand tracking (removed, 2026-10-08)
 Was an experimental MediaPipe Hand Landmarker spike (`lib/handTracking.ts`, `?hands=1|cpu`), **not viable on budget phones**: Poco C65 GPU 5-10 fps render and 160-330 ms per detection; CPU worse (1-3 fps while tracking). Touch manipulation is the only interaction now. Removed `lib/handTracking.ts`, the 31 MB `frontend/public/mediapipe/` model files, and the `@mediapipe/tasks-vision` dependency; the fps HUD lost its `hands N fps | N ms DELEGATE | state` segment accordingly.
 
 ### Measured performance
 - Marker tracking (AR.js) is the frame-rate ceiling on weak phones, not rendering.
-- Redmi A3: about 10 fps at 640x480 every frame; about 20 with every-2nd-frame; after quality tuning all scenes 17-21 fps. The 320x240 tracking option (b23+) still needs a phone test.
+- Redmi A3: about 10 fps at 640x480 every frame; about 20 with every-2nd-frame; after quality tuning all scenes 17-21 fps. With 320x240 tracking (`?q=2`, readout `q2 d2 t320`), 1.1 Inertia with the marker steady: 22-25 fps, mean 23.7 over 30 s (b38, 2026-10-09, phone charging at 32-38 C). About the 24 fps target, not consistently above it.
 - Poco C65: 22-25 fps at room temperature. Cold phones behave differently; test at room temperature.
 - iPhone 16 Plus: 60 fps (the thesis originally mis-stated 23; corrected in B.9-B.11 and Table 4.3).
 - Target: 24 fps.

@@ -185,11 +185,37 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
         for (const [name, target] of Object.entries(interact.targets)) for (let node: THREE.Object3D | null = object; node; node = node.parent) if (node === target) return shown(target) ? name : "";
         return "";
       };
+      // On a phone a battery cell or lever can project to under 10 CSS px, so a tap that misses every
+      // part still grabs the nearest one whose screen footprint, grown to MIN_TOUCH px, contains it.
+      // Targets already bigger than that keep their exact shape.
+      const MIN_TOUCH = 44;
+      const box = new THREE.Box3();
+      const corner = new THREE.Vector3();
+      const nearestSmall = (event: PointerEvent) => {
+        const rect = renderer.domElement.getBoundingClientRect();
+        let best = "", bestDistance = Infinity;
+        for (const [name, target] of Object.entries(interact.targets)) {
+          if (!shown(target) || box.setFromObject(target).isEmpty()) continue;
+          let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+          for (let i = 0; i < 8; i++) {
+            corner.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z).project(camera);
+            const x = rect.left + (corner.x + 1) / 2 * rect.width, y = rect.top + (1 - corner.y) / 2 * rect.height;
+            x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+          }
+          if (x1 - x0 >= MIN_TOUCH && y1 - y0 >= MIN_TOUCH) continue;
+          const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+          const halfW = Math.max(x1 - x0, MIN_TOUCH) / 2, halfH = Math.max(y1 - y0, MIN_TOUCH) / 2;
+          if (Math.abs(event.clientX - cx) > halfW || Math.abs(event.clientY - cy) > halfH) continue;
+          const distance = Math.hypot(event.clientX - cx, event.clientY - cy);
+          if (distance < bestDistance) { best = name; bestDistance = distance; }
+        }
+        return best;
+      };
       const finish = (event: PointerEvent) => { grab = ""; if (mount.hasPointerCapture(event.pointerId)) mount.releasePointerCapture(event.pointerId); };
       const onDown = (event: PointerEvent) => {
         if (viewMode === "ar" && !presentationRoot.visible) return;
         aim(event);
-        const name = raycaster.intersectObjects(Object.values(interact.targets), true).map(hit => nameOf(hit.object)).find(Boolean) ?? "";
+        const name = raycaster.intersectObjects(Object.values(interact.targets), true).map(hit => nameOf(hit.object)).find(Boolean) || nearestSmall(event);
         if (!name) return;
         grab = name; start = { x: event.clientX, y: event.clientY }; moved = 0;
         mount.setPointerCapture(event.pointerId);
@@ -236,7 +262,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
       if (now - statsAt >= 1000) {
         renderFps = Math.round(frames * 1000 / (now - statsAt));
         frames = 0; statsAt = now;
-        if (fpsText) fpsText.textContent = `render ${renderFps} fps | q${quality} d${detectEvery} t${trackingSize.w}${emptyScene ? " empty" : ""} | b39`;
+        if (fpsText) fpsText.textContent = `render ${renderFps} fps | q${quality} d${detectEvery} t${trackingSize.w}${emptyScene ? " empty" : ""} | b40`;
       }
     };
 
