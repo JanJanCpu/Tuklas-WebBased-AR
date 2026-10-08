@@ -16,7 +16,7 @@ This is **pre-defense**, in a dedicated polish window before the panel and befor
 3. **After school testing, before the defense:** the real data from that testing (curriculum validation, pretest/posttest, SUS) needs to go into Chapter 4/5 and the appendices, replacing/extending whatever pilot data is there now.
 
 Open items:
-- Done 2026-10-09 over USB (see Measured performance): Redmi A3 fps at q2, Earth 2.2 legibility (labels enlarged, b39), circuit gestures (small-target tap fix, b40). Still open from that session: the account features end to end on a phone (bulk add, slips, New Password, SMS/Email).
+- Done 2026-10-09 over USB (see Measured performance): Redmi A3 fps at q2, Earth 2.2 legibility (labels enlarged, b39), circuit gestures (small-target tap fix, b40). Account features also passed end to end on the phone (bulk add with plain and SF1 names, logins, New Password invalidates the old one, SMS opens Messages and Email opens Gmail with the login typed in); printing slips on Android gave a blank 2nd page, fixed by `min-height: 0` on `body.printing-slips` (`body` is `min-height: 100vh`).
 - Permanent CORS wildcard for `tuklas-web-based-ar-frontend-*-tuklasar.vercel.app` was offered, not applied (would need code, since the allowlist is exact-match).
 - Optional: open-source 3D models; a PR back to the friend's repo once devices are re-tested.
 - If the upgraded build is reported in the thesis or paper, re-measure Redmi A3 / Poco C65 (see the fps table below).
