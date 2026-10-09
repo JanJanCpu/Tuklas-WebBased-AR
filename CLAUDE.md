@@ -19,7 +19,7 @@ Open items:
 - Done 2026-10-09 over USB (see Measured performance): Redmi A3 fps at q2, Earth 2.2 legibility (labels enlarged, b39), circuit gestures (small-target tap fix, b40). Account features also passed end to end on the phone (bulk add with plain and SF1 names, logins, New Password invalidates the old one, SMS opens Messages and Email opens Gmail with the login typed in); printing slips on Android gave a blank 2nd page, fixed by `min-height: 0` on `body.printing-slips` (`body` is `min-height: 100vh`).
 - Done 2026-10-09: per-push preview URLs (`tuklas-web-based-ar-frontend-<9-char hash>-tuklasar.vercel.app` and `...-git-<branch>-tuklasar.vercel.app`) are allowed by a regex in `backend/src/app.ts`, on top of the `CLIENT_ORIGIN` list. Deployed and verified with curl.
 - Optional: open-source 3D models; a PR back to the friend's repo once devices are re-tested.
-- If the upgraded build is reported in the thesis or paper, re-measure Redmi A3 / Poco C65 (see the fps table below).
+- Done 2026-10-09: Redmi A3 and Poco C65 re-measured on b40, unplugged (see Measured performance). The 19 fps step-down threshold stays as it is (user decision).
 
 ## Fork workflow (IMPORTANT)
 
