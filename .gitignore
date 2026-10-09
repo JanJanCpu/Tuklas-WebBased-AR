@@ -7,3 +7,4 @@ npm-debug.log*
 *.tsbuildinfo
 .neon
 .browser-check/
+graphify-out/
