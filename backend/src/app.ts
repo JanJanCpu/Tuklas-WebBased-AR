@@ -16,13 +16,16 @@ export function createApp() {
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
+  // Vercel preview deployments of the frontend get a new URL on every push:
+  // <project>-<9-char hash>-tuklasar.vercel.app or <project>-git-<branch>-tuklasar.vercel.app.
+  const previewOrigin = /^https:\/\/tuklas-web-based-ar-frontend-(?:[a-z0-9]{9}|git-[a-z0-9-]+)-tuklasar\.vercel\.app$/;
 
   app.use(helmet());
   app.use(
     cors({
       origin(origin, callback) {
         // Allow non-browser requests (no Origin header) and any configured origin.
-        if (!origin || allowedOrigins.includes(origin)) {
+        if (!origin || allowedOrigins.includes(origin) || previewOrigin.test(origin)) {
           callback(null, true);
           return;
         }
