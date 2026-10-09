@@ -25,7 +25,7 @@ Open items:
 
 The original repo (`earldulay/Tuklas-WebBased-AR`) and its frontend Vercel project belong to the co-author. Do not experiment there.
 - Remotes: `origin` = `JanJanCpu/Tuklas-WebBased-AR` (the fork), `upstream` = `earldulay/Tuklas-WebBased-AR`.
-- Tag `defended-2026-09` = defended commit `2982fc6`. Keep `main` unchanged until devices are re-tested; do experimental work on `feature/dynamic-ar`.
+- Tag `defended-2026-09` = defended commit `2982fc6`. On 2026-10-09 fork `main` was fast-forwarded to `feature/dynamic-ar` (b40) after the device re-tests, so `-nine` (no Vercel login needed) is the link for school testing. Keep doing work on `feature/dynamic-ar` and fast-forward `main` when a build is phone-tested.
 - Frontend test URLs: stable branch alias `https://tuklas-web-based-ar-frontend-git-feature-dynamic-ar-tuklasar.vercel.app` (auto-builds the branch; Vercel SSO protects previews, so the viewer must be logged in to Vercel). Fork main: `https://tuklas-web-based-ar-frontend-nine.vercel.app`. Friend's original: `https://tuklas-web-based-ar-frontend.vercel.app`. Per-deployment preview URLs change every push; since 2026-10-09 they pass CORS through the `previewOrigin` regex in `backend/src/app.ts`. "Login failed / Check your connection" usually means the phone is on a URL that is in neither the list nor the regex.
 - The backend and Neon DB are shared with the defended system; use test accounts only. Neon snapshot `post-defense-backup-2026-09-19` (project `round-poetry-34806070`, only 6 hours of history retention) protects the pilot data.
 
