@@ -1056,6 +1056,37 @@ input[type="range"] {
   border-left: 5px solid var(--gold);
 }
 
+.lesson-card section + section {
+  margin-top: 12px;
+}
+
+.lesson-card h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  color: var(--blue-dark);
+}
+
+.lesson-card p,
+.lesson-card ul {
+  margin: 0 0 6px;
+}
+
+.lesson-card ul {
+  padding-left: 20px;
+}
+
+.lesson-competency {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.lesson-competency p {
+  margin: 4px 0 0;
+}
+
 .camera-video {
   position: absolute;
   inset: 0;

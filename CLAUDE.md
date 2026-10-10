@@ -12,7 +12,7 @@ Capstone: "Development of an Offline Augmented Reality Science Laboratory Simula
 
 This is **pre-defense**, in a dedicated polish window before the panel and before school testing:
 1. Thesis audit against the code, research instruments, and Chapter 4/5 drafted from real data only are done. Never fabricate results, scores or logs; every number in the thesis comes from the real pilot data.
-2. **Now (through the polish window):** the adviser/panel wants the AR more dynamic ("Pokemon GO level", less flat and static, replacing physical lab objects, hand/touch manipulation) and the general app UI polished, before the upgraded build is used for real SOP1/2/3 testing at Antonio A. Maceda Integrated School (letters 1/2/6 are for arranging that testing) and before the October defense. All of this lives on the fork branch `feature/dynamic-ar`. Latest build label: **b40**.
+2. **Now (through the polish window):** the adviser/panel wants the AR more dynamic ("Pokemon GO level", less flat and static, replacing physical lab objects, hand/touch manipulation) and the general app UI polished, before the upgraded build is used for real SOP1/2/3 testing at Antonio A. Maceda Integrated School (letters 1/2/6 are for arranging that testing) and before the October defense. All of this lives on the fork branch `feature/dynamic-ar`. Latest build label: **b41** (fork `main` / `-nine` is still b40).
 3. **After school testing, before the defense:** the real data from that testing (curriculum validation, pretest/posttest, SUS) needs to go into Chapter 4/5 and the appendices, replacing/extending whatever pilot data is there now.
 
 Open items:
@@ -144,6 +144,9 @@ The Observe screen's camera/3D viewport used to scroll away like any other card,
 
 The sticky offset (`top: calc(var(--header-h, 140px) + 10px)`) is measured in JS via a `ResizeObserver` on the header (`headerRef` + an effect keyed on `screen`), not a hardcoded pixel guess - the header's height isn't constant, since a long module title wraps to two lines on some screens and would either leave a gap or let the header cover the camera if the offset were a fixed constant. Capped at `max-width: 420px` so it doesn't balloon into a huge pinned block on a tablet-width screen (`.screen-stack` goes up to 760px).
 
+### Post-activity lessons (2026-10-10)
+`frontend/src/data/lessons.ts` holds one lesson per module (Key idea, What you saw, Common mistake, In real life, ...), shown by `LessonCard` in `App.tsx` on the Result screen in place of the old "Look Back" (which remains the fallback). Lessons appear only after Explain, never before Predict, so predictions stay genuine POE predictions. Competency lines are quoted word for word from the DepEd MATATAG Science CG Grades 3-10 (August 2023), Grade 9. The file was generated from `Tuklas-Capstone-Backup/lessons-draft-2026-10-10.md`; text is pending a science teacher's review, so edit `lessons.ts` directly for fixes. Frontend-only: the API does not serve lessons.
+
 ### Backend structure
 
 Thin Express app (`app.ts`) mounting per-resource routers (`routes/*.ts`); `lib/auth.ts` (`requireAuth`/`requireRole`), `lib/validation.ts` (zod schemas), `lib/prisma.ts` (singleton client). `lib/database.ts`'s `hasDatabaseUrl()` gate degrades gracefully (fallback data or 503 on writes) without `DATABASE_URL`.
@@ -170,7 +173,7 @@ Three.js 0.164.1 + AR.js scene. Studio environment lighting + ACES tone mapping.
 Auto step-down when fps stays under 19, persisted in `localStorage` as `tuklas-quality-v2`:
 - 0 full; 1 marker detection every 2nd frame; 2 pixelRatio 1 + 320x240 tracking canvas (`trackingSize`, `trackingLow` state); 3 Lambert (cheaper) shading.
 
-URL parameters: `?fps=1` (HUD: `render N fps | qN dN tNNN[ empty] | bNN`), `?q=<0-3>` force a level, `?detect=<n>` detect every n frames, `?empty=1` empty scene (isolates tracking cost). The HUD build label (currently `b40`, a string in `ScienceScene.tsx`) is how you confirm a phone loaded the new build; bump it on every change you want to verify remotely.
+URL parameters: `?fps=1` (HUD: `render N fps | qN dN tNNN[ empty] | bNN`), `?q=<0-3>` force a level, `?detect=<n>` detect every n frames, `?empty=1` empty scene (isolates tracking cost). The HUD build label (currently `b41`, a string in `ScienceScene.tsx`) is how you confirm a phone loaded the new build; bump it on every change you want to verify remotely.
 
 ### Hand tracking (removed, 2026-10-08)
 Was an experimental MediaPipe Hand Landmarker spike (`lib/handTracking.ts`, `?hands=1|cpu`), **not viable on budget phones**: Poco C65 GPU 5-10 fps render and 160-330 ms per detection; CPU worse (1-3 fps while tracking). Touch manipulation is the only interaction now. Removed `lib/handTracking.ts`, the 31 MB `frontend/public/mediapipe/` model files, and the `@mediapipe/tasks-vision` dependency; the fps HUD lost its `hands N fps | N ms DELEGATE | state` segment accordingly.

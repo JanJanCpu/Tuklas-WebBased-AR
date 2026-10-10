@@ -6,6 +6,7 @@ import { makePassword, makeUsername, parseClassList } from "./lib/credentials";
 import { createRecordSession } from "./lib/record-session";
 import { prepareOfflineFiles } from "./lib/offline";
 import { modules as fallbackModules } from "./data/modules";
+import { lessons } from "./data/lessons";
 import { getObservationModel, getObservationDefaults, formatControlValue, initialLabState } from "./lib/experiments";
 import { ExperimentControls } from "./components/ExperimentControls";
 import { AccountDetails } from "./components/AccountDetails";
@@ -52,6 +53,40 @@ const moduleIcons: Record<string, LucideIcon> = {
   life: Microscope,
   "earth-space": Earth,
 };
+
+// Post-activity lesson (after Explain, never before Predict). Consecutive "- " lines become one list.
+function LessonCard({ module }: { module: LearningModule }) {
+  const lesson = lessons[module.id];
+  if (!lesson) return <article className="panel-card look-back"><p className="eyebrow">Look Back</p><h2>{module.title}</h2><p>{module.overview}</p></article>;
+  return (
+    <article className="panel-card look-back lesson-card">
+      <p className="eyebrow">Lesson</p>
+      <h2>{module.title}</h2>
+      {lesson.sections.map((section) => {
+        const blocks: (string | string[])[] = [];
+        for (const line of section.text) {
+          const item = line.startsWith("- ") ? line.slice(2) : null;
+          const last = blocks[blocks.length - 1];
+          if (item === null) blocks.push(line);
+          else if (Array.isArray(last)) last.push(item);
+          else blocks.push([item]);
+        }
+        return (
+          <section key={section.title}>
+            <h3>{section.title}</h3>
+            {blocks.map((block, index) => Array.isArray(block)
+              ? <ul key={index}>{block.map((item) => <li key={item}>{item}</li>)}</ul>
+              : <p key={index}>{block}</p>)}
+          </section>
+        );
+      })}
+      <footer className="lesson-competency">
+        <strong>MATATAG Grade 9 competency</strong>
+        {lesson.competencies.map((competency) => <p key={competency.code}>{competency.code}: "{competency.text}"</p>)}
+      </footer>
+    </article>
+  );
+}
 
 function ModuleIcon({ moduleId }: { moduleId: string }) {
   const groupId = fallbackModules.find(item => item.id === moduleId)?.groupId || moduleId;
@@ -1113,7 +1148,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
             ) : (
               <article className="result-card"><div className="score-ring"><strong>{Math.max(25, percent)}%</strong><span>Complete</span></div><h2>Great work!</h2><p>Prediction, Observation, and Explanation completed.</p></article>
             )}
-            <article className="panel-card look-back"><p className="eyebrow">Look Back</p><h2>{activeModule.title}</h2><p>{activeModule.overview}</p></article>
+            <LessonCard module={activeModule} />
             {activeModuleFeedback && (
               <article className="panel-card feedback-card">
                 <div className="row-between"><p className="eyebrow">Teacher Feedback</p>{activeModuleFeedback.score != null && <strong className="overall-percent">{activeModuleFeedback.score}/100</strong>}</div>
