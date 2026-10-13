@@ -24,7 +24,8 @@ interface ScienceSceneProps {
 }
 
 const cameraParametersUrl = "/assets/camera_para.dat";
-const tuklasMarkerUrl = "/assets/tuklas-marker.patt";
+// Both printed markers work: the original Hiro marker and the Tuklas flask marker (2026-10-14).
+const markerUrls = ["/assets/tuklas-marker.patt", "/assets/tuklas-flask.patt"];
 
 export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, viewMode, onArReady, onArStatus, onMarkerChange, onControlChange, onLabChange }: ScienceSceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -62,6 +63,9 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
 
     const trackedRoot = new THREE.Group();
     scene.add(trackedRoot);
+    // One root per marker; AR.js writes each marker's pose to its own root.
+    const markerRoots = [trackedRoot, ...markerUrls.slice(1).map(() => new THREE.Group())];
+    markerRoots.slice(1).forEach(root => scene.add(root));
 
     const presentationRoot = new THREE.Group();
     if (viewMode === "ar") {
@@ -292,18 +296,19 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
         arFrame += 1;
         const analyzed = arFrame % detectEvery === 0;
         if (analyzed) arContext.update(arSource.domElement);
-        if (trackedRoot.visible) {
+        const tracked = markerRoots.find(root => root.visible);
+        if (tracked) {
           missedFrames = 0;
           presentationRoot.visible = true;
           if (!hasStablePose) {
-            presentationRoot.position.copy(trackedRoot.position);
-            presentationRoot.quaternion.copy(trackedRoot.quaternion);
-            presentationRoot.scale.copy(trackedRoot.scale);
+            presentationRoot.position.copy(tracked.position);
+            presentationRoot.quaternion.copy(tracked.quaternion);
+            presentationRoot.scale.copy(tracked.scale);
             hasStablePose = true;
           } else {
-            presentationRoot.position.lerp(trackedRoot.position, 0.32);
-            presentationRoot.quaternion.slerp(trackedRoot.quaternion, 0.28);
-            presentationRoot.scale.lerp(trackedRoot.scale, 0.32);
+            presentationRoot.position.lerp(tracked.position, 0.32);
+            presentationRoot.quaternion.slerp(tracked.quaternion, 0.28);
+            presentationRoot.scale.lerp(tracked.scale, 0.32);
           }
         } else if (hasStablePose && analyzed) {
           missedFrames += 1;
@@ -312,8 +317,8 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
             hasStablePose = false;
           }
         }
-        if (trackedRoot.visible !== markerVisible) {
-          markerVisible = trackedRoot.visible;
+        if (Boolean(tracked) !== markerVisible) {
+          markerVisible = Boolean(tracked);
           onMarkerChange?.(markerVisible);
           onArStatus?.(markerVisible ? "Tuklas marker detected." : "Looking for the Tuklas marker...");
         }
@@ -371,7 +376,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
     resizeObserver.observe(mount);
 
     if (viewMode === "ar") {
-      trackedRoot.visible = false;
+      markerRoots.forEach(root => { root.visible = false; });
       onArReady?.(false);
       onMarkerChange?.(false);
       onArStatus?.("Loading AR marker tracking...");
@@ -418,10 +423,14 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
                 // Disposing earlier nulls patternMarkers under the pending callback.
                 let finishMarkerSetup!: () => void;
                 markerSetup = new Promise(resolve => { finishMarkerSetup = resolve; });
+                let pending = markerUrls.length;
+                let failed = false;
                 const loadMarker = controller.loadMarker.bind(controller);
                 controller.loadMarker = url => loadMarker(url).catch(() => -1).then(id => {
-                  if (!cancelled) {
-                    if (id < 0) {
+                  if (id < 0) failed = true;
+                  pending -= 1;
+                  if (!cancelled && pending === 0) {
+                    if (failed) {
                       onArReady?.(false);
                       onArStatus?.("Marker file failed to load. Prepare offline files again or use 3D mode.");
                     } else {
@@ -430,15 +439,15 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
                     }
                   }
                   // Let AR.js's promise continuation register this ID before disposal.
-                  window.setTimeout(finishMarkerSetup, 0);
+                  if (pending === 0) window.setTimeout(finishMarkerSetup, 0);
                   return id;
                 });
-                new THREEx.ArMarkerControls(context, trackedRoot, {
+                markerUrls.forEach((patternUrl, index) => new THREEx.ArMarkerControls(context, markerRoots[index], {
                   type: "pattern",
-                  patternUrl: tuklasMarkerUrl,
+                  patternUrl,
                   changeMatrixMode: "modelViewMatrix",
                   minConfidence: 0.7,
-                });
+                }));
 
                 camera.projectionMatrix.copy(context.getProjectionMatrix());
                 resize();
