@@ -11,6 +11,7 @@ import { getObservationModel, getObservationDefaults, formatControlValue, initia
 import { ExperimentControls } from "./components/ExperimentControls";
 import { AccountDetails } from "./components/AccountDetails";
 import type { ActivityRecord, AuthUser, ClassProgressRecord, Feedback, LearningModule, Role, Screen, Section, SectionSummary, Stage, ViewMode } from "./types/domain";
+import AppInfo from "./components/AppInfo";
 import { Activity, BookOpen, ChevronLeft, ChevronRight, CircuitBoard, Download, KeyRound, Mail, MessageSquare, Earth, Eye, Home, Microscope, Printer, ScanLine, Settings, Thermometer, Users, type LucideIcon } from "lucide-react";
 
 // three.js (pulled in by ScienceScene) is a heavy dependency that only the
@@ -841,6 +842,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
           </div>
           <a className="marker-preview" href="/assets/tuklas-marker.png" target="_blank" rel="noreferrer" aria-label="Open printable Tuklas AR marker"><span>TUKLAS</span></a>
         </section>
+        <AppInfo />
       </main>
     );
   }
@@ -1185,6 +1187,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
             <button className="settings-row" onClick={handleSync}><span><strong>Sync Saved Work</strong><small>{records.filter((record) => !record.syncedAt).length} records waiting to sync.</small></span><span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span></button>
             <button className="settings-row" onClick={checkDevice}><span><strong>Device Check</strong><small>{deviceStatus}</small></span><span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span></button>
             <article className="panel-card offline-checklist"><p className="eyebrow">Offline Setup</p><ol><li>Open this HTTPS app while connected.</li><li>Tap Prepare for Offline Use.</li><li>Add the app to the home screen.</li><li>Reopen in airplane mode and run one trial.</li></ol></article>
+            <AppInfo />
             {!isTeacherPreview && (
               <article className="panel-card teacher-tools">
                 <div className="row-between"><h2>Saved Work</h2><button className="text-button compact-button" onClick={async () => {

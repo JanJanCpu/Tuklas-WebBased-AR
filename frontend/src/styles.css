@@ -2117,3 +2117,42 @@ input[type="range"] {
 .saved-entry p {
   margin: 4px 0 0;
 }
+
+/* About / FAQ / Privacy / Terms: native <details>, collapsed by default. */
+.app-info {
+  display: grid;
+  gap: 10px;
+}
+
+.info-section > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.info-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.info-section[open] > summary .disclosure-chevron {
+  transform: rotate(90deg);
+}
+
+.info-body {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+  line-height: 1.5;
+}
+
+.info-body p,
+.info-body ul {
+  margin: 0;
+}
+
+.info-body ul {
+  padding-left: 20px;
+}
+
+.info-faq p {
+  margin: 2px 0 0;
+}
