@@ -871,7 +871,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
             <h2>One printed marker per group</h2>
             <p>Students use the same marker across lessons during camera observation.</p>
           </div>
-          <a className="marker-preview" href="/assets/tuklas-marker.png" target="_blank" rel="noreferrer" aria-label="Open printable Tuklas AR marker"><span>TUKLAS</span></a>
+          <a className="marker-preview" href="/assets/tuklas-flask.png" target="_blank" rel="noreferrer" aria-label="Open printable Tuklas AR marker"><img src="/assets/tuklas-flask.png" alt="" /></a>
         </section>
         <AppInfo />
       </main>
@@ -987,11 +987,11 @@ function Workspace({ user }: { user: AuthUser | null }) {
             <article className="panel-card marker-access">
               <div className="marker-access-copy">
                 <div><h2>Printable and downloadable marker</h2><p>Open the marker for printing or download a copy for offline classroom use.</p></div>
-                <a className="marker-preview" href="/assets/tuklas-marker.png" target="_blank" rel="noreferrer" aria-label="Open printable Tuklas AR marker"><span>TUKLAS</span></a>
+                <a className="marker-preview" href="/assets/tuklas-flask.png" target="_blank" rel="noreferrer" aria-label="Open printable Tuklas AR marker"><img src="/assets/tuklas-flask.png" alt="" /></a>
               </div>
               <div className="marker-actions">
-                <a className="primary-button" href="/assets/tuklas-marker.png" target="_blank" rel="noreferrer"><Printer size={18} />Open to Print</a>
-                <a className="secondary-button" href="/assets/tuklas-marker.png" download="tuklas-ar-marker.png"><Download size={18} />Download Marker</a>
+                <a className="primary-button" href="/assets/tuklas-flask.png" target="_blank" rel="noreferrer"><Printer size={18} />Open to Print</a>
+                <a className="secondary-button" href="/assets/tuklas-flask.png" download="tuklas-ar-marker.png"><Download size={18} />Download Marker</a>
               </div>
             </article>
           </section>
