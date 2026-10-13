@@ -678,7 +678,8 @@ function Workspace({ user }: { user: AuthUser | null }) {
 
   // One row per student and module they started, for the teacher's records or a spreadsheet.
   function downloadSectionCsv() {
-    const cell = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    // A leading = + - @ would make Excel run a student's answer as a formula; the ' keeps it as text.
+    const cell = (value: unknown) => `"${String(value ?? "").replace(/^[=+\-@\t\r]/, "'$&").replace(/"/g, '""')}"`;
     const stageText = (list: ClassProgressRecord[], stage: Stage) => list.filter((record) => record.stage === stage).map((record) => record.text).join(" | ");
     const rows: unknown[][] = [["Student", "Username", "Module", "Mode", "Predict", "Observe", "Explain", "Reflection", "Score", "Teacher comment", "Last submitted"]];
     for (const student of sectionStudents) {
@@ -708,8 +709,10 @@ function Workspace({ user }: { user: AuthUser | null }) {
     window.print();
   }
 
-  function logout() {
-    const unsynced = records.filter((record) => !record.syncedAt).length;
+  async function logout() {
+    // Try to send waiting answers first so the warning only shows when they really can't go.
+    const latest = navigator.onLine ? await syncUnsyncedRecords(records) : records;
+    const unsynced = latest.filter((record) => !record.syncedAt).length;
     if (unsynced && !window.confirm(`${unsynced} answer${unsynced === 1 ? " has" : "s have"} not been sent to your teacher yet. ${navigator.onLine ? "Tap Cancel and wait a moment, or log out anyway; it will be sent next time you log in on this device." : "They stay saved on this device, but you need internet to log back in."} Log out anyway?`)) return;
     clearSession();
     setScreen("home");
