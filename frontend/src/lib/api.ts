@@ -114,3 +114,10 @@ export function submitFeedback(sectionId: string, studentId: string, moduleId: s
     body: JSON.stringify({ score, comment }),
   });
 }
+
+export function changeMyPassword(currentPassword: string, newPassword: string) {
+  return request<{ ok: true }>("/auth/password", {
+    method: "POST",
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}

@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ChevronRight, UserRound, X } from "lucide-react";
-import { ApiError, fetchMyAccount } from "../lib/api";
+import { ApiError, changeMyPassword, fetchMyAccount } from "../lib/api";
 import { cacheAccount, getToken } from "../lib/auth";
 import type { AuthUser } from "../types/domain";
 
@@ -10,6 +10,27 @@ export function AccountDetails({ user }: { user: AuthUser }) {
   const [account, setAccount] = useState(user);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [passwordStatus, setPasswordStatus] = useState("");
+  const [passwordSaving, setPasswordSaving] = useState(false);
+
+  async function handleChangePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const next = String(data.get("next"));
+    if (next !== String(data.get("confirm"))) { setPasswordStatus("The new passwords do not match."); return; }
+    setPasswordSaving(true);
+    setPasswordStatus("");
+    try {
+      await changeMyPassword(String(data.get("current")), next);
+      form.reset();
+      setPasswordStatus("Password changed. Use the new password next time you log in.");
+    } catch (cause) {
+      setPasswordStatus(cause instanceof ApiError ? cause.message : "You need internet to change your password.");
+    } finally {
+      setPasswordSaving(false);
+    }
+  }
 
   useEffect(() => { setAccount(user); }, [user]);
 
@@ -101,6 +122,17 @@ export function AccountDetails({ user }: { user: AuthUser }) {
           </>}
           <div><dt>Account created</dt><dd>{joined}</dd></div>
         </dl>
+        <details className="change-password">
+          <summary>Change password</summary>
+          <form className="auth-form" onSubmit={handleChangePassword}>
+            <label className="field-label">Current password<input name="current" type="password" autoComplete="current-password" required /></label>
+            <label className="field-label">New password<input name="next" type="password" autoComplete="new-password" required minLength={8} /></label>
+            <label className="field-label">Confirm new password<input name="confirm" type="password" autoComplete="new-password" required minLength={8} /></label>
+            {passwordStatus && <p role="status">{passwordStatus}</p>}
+            <button className="primary-button" type="submit" disabled={passwordSaving}>{passwordSaving ? "Saving..." : "Save New Password"}</button>
+            {user.role === "student" && <p className="muted">Forgot it later? Your teacher can give you a new one.</p>}
+          </form>
+        </details>
         {user.role === "student" && error && <div role="status">
           <p>{error}</p>
           <button type="button" disabled={loading} onClick={() => setRefreshVersion(current => current + 1)}>

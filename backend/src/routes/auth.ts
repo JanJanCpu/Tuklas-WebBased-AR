@@ -112,6 +112,29 @@ authRouter.get("/me", requireAuth, async (request, response, next) => {
   }
 });
 
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required."),
+  newPassword: passwordSchema,
+});
+
+// Any signed-in user can change their own password; the current one is required.
+authRouter.post("/password", requireAuth, async (request, response, next) => {
+  if (!requireDatabase(response)) return;
+
+  try {
+    const payload = changePasswordSchema.parse(request.body);
+    const user = await prisma.user.findUnique({ where: { id: request.user!.sub } });
+    if (!user || !(await verifyPassword(payload.currentPassword, user.passwordHash))) {
+      response.status(400).json({ error: "Current password is incorrect." });
+      return;
+    }
+    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(payload.newPassword) } });
+    response.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
 const resetProgressSchema = z.object({
   moduleId: z.string().min(1).optional(),
 });

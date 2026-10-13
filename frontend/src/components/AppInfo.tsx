@@ -1,8 +1,8 @@
 import { ChevronRight } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 // Shown in Settings and in the fps HUD; bump on every build you want to confirm on a phone.
-export const BUILD = "b42";
+export const BUILD = "b43";
 const UPDATED = "October 13, 2026";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -65,5 +65,34 @@ export default function AppInfo() {
         </ul>
       </Section>
     </div>
+  );
+}
+
+const tips = {
+  student: [
+    ["Predict", "Before each experiment, write what you think will happen. There is no wrong prediction."],
+    ["Observe", "Point the camera at the printed TUKLAS marker and keep it in view, or tap Use 3D Model. Drag and tap the parts to run trials."],
+    ["Explain", "Compare what you saw with your prediction. Your answers go to your teacher, even if you were offline."],
+  ],
+  teacher: [
+    ["Make a class", "Go to Classes, create a section, then use Add Whole Class to paste your class list."],
+    ["Give out logins", "Print the login slips, or send each one by SMS or email from your own phone."],
+    ["Print the marker", "One printed TUKLAS marker per group is enough. Use Preview Lessons to try each activity first."],
+  ],
+} as const;
+
+// First-run tips on Home, hidden for good once dismissed on this device.
+export function GettingStarted({ userId, role }: { userId: string; role: "student" | "teacher" }) {
+  const key = `tuklas-tips-done:${userId}`;
+  const [done, setDone] = useState(() => { try { return localStorage.getItem(key) === "1"; } catch { return false; } });
+  if (done) return null;
+  return (
+    <article className="panel-card getting-started">
+      <p className="eyebrow">Getting Started</p>
+      <ol>
+        {tips[role].map(([title, text]) => <li key={title}><strong>{title}</strong><p>{text}</p></li>)}
+      </ol>
+      <button type="button" className="secondary-button compact-button" onClick={() => { try { localStorage.setItem(key, "1"); } catch { /* still hide for this visit */ } setDone(true); }}>Got it</button>
+    </article>
   );
 }

@@ -11,7 +11,7 @@ import { getObservationModel, getObservationDefaults, formatControlValue, initia
 import { ExperimentControls } from "./components/ExperimentControls";
 import { AccountDetails } from "./components/AccountDetails";
 import type { ActivityRecord, AuthUser, ClassProgressRecord, Feedback, LearningModule, Role, Screen, Section, SectionSummary, Stage, ViewMode } from "./types/domain";
-import AppInfo from "./components/AppInfo";
+import AppInfo, { GettingStarted } from "./components/AppInfo";
 import { Activity, BookOpen, ChevronLeft, ChevronRight, CircuitBoard, Download, KeyRound, Mail, MessageSquare, Earth, Eye, Home, Microscope, Printer, ScanLine, Settings, Thermometer, Users, type LucideIcon } from "lucide-react";
 
 // three.js (pulled in by ScienceScene) is a heavy dependency that only the
@@ -676,6 +676,32 @@ function Workspace({ user }: { user: AuthUser | null }) {
     }
   }
 
+  // One row per student and module they started, for the teacher's records or a spreadsheet.
+  function downloadSectionCsv() {
+    const cell = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const stageText = (list: ClassProgressRecord[], stage: Stage) => list.filter((record) => record.stage === stage).map((record) => record.text).join(" | ");
+    const rows: unknown[][] = [["Student", "Username", "Module", "Mode", "Predict", "Observe", "Explain", "Reflection", "Score", "Teacher comment", "Last submitted"]];
+    for (const student of sectionStudents) {
+      for (const module of modules) {
+        const list = sectionRecords.filter((record) => record.userId === student.id && record.moduleId === module.id);
+        const grade = sectionFeedback.find((entry) => entry.studentId === student.id && entry.moduleId === module.id);
+        if (!list.length && !grade) continue;
+        const last = list.map((record) => record.createdAt).sort().pop();
+        rows.push([student.name, student.username, `${module.quarter}: ${module.title}`, [...new Set(list.map((record) => record.mode))].join("/"),
+          stageText(list, "Predict"), stageText(list, "Observe"), stageText(list, "Explain"), stageText(list, "Reflection"),
+          grade?.score ?? "", grade?.comment ?? "", last ? new Date(last).toLocaleString() : ""]);
+      }
+    }
+    // The BOM makes Excel read names with ñ correctly.
+    const blob = new Blob(["﻿" + rows.map((row) => row.map(cell).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `tuklas-${(activeSection?.name || "section").replace(/[^\w-]+/g, "-")}-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   function printSlips() {
     document.body.classList.add("printing-slips");
     window.addEventListener("afterprint", () => document.body.classList.remove("printing-slips"), { once: true });
@@ -683,6 +709,8 @@ function Workspace({ user }: { user: AuthUser | null }) {
   }
 
   function logout() {
+    const unsynced = records.filter((record) => !record.syncedAt).length;
+    if (unsynced && !window.confirm(`${unsynced} answer${unsynced === 1 ? " has" : "s have"} not been sent to your teacher yet. ${navigator.onLine ? "Tap Cancel and wait a moment, or log out anyway; it will be sent next time you log in on this device." : "They stay saved on this device, but you need internet to log back in."} Log out anyway?`)) return;
     clearSession();
     setScreen("home");
     setHistory([]);
@@ -892,6 +920,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
       <main className="screen-stack">
         {screen === "home" && (
           <section className="screen active">
+            <GettingStarted userId={user.id} role={isTeacherPreview ? "teacher" : "student"} />
             {isTeacherPreview ? (
               <>
                 <article className="panel-card overall-progress">
@@ -1283,6 +1312,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
               <p className="eyebrow">Section</p>
               <h2>{activeSection?.name || "Loading..."}</h2>
               <p>{sectionStudents.length} student{sectionStudents.length === 1 ? "" : "s"} enrolled</p>
+              {sectionRecords.length > 0 && <button type="button" className="secondary-button" onClick={downloadSectionCsv}><Download size={18} />Download Results (CSV)</button>}
             </article>
             <article className="panel-card">
               <button type="button" className="row-between disclosure-toggle" onClick={() => setShowAddStudent((current) => !current)} aria-expanded={showAddStudent}>

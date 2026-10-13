@@ -364,6 +364,15 @@ small {
   transition: opacity 0ms;
 }
 
+/* Icon + label buttons (Download, Print Slips): space the icon from the text. */
+.primary-button:has(> svg),
+.secondary-button:has(> svg) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
 .secondary-button,
 .text-button {
   border: 1px solid var(--blue);
@@ -2154,5 +2163,33 @@ input[type="range"] {
 }
 
 .info-faq p {
+  margin: 2px 0 0;
+}
+
+.change-password {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.change-password > summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--blue);
+  padding: 6px 0;
+}
+
+.change-password form {
+  margin-top: 8px;
+}
+
+.getting-started ol {
+  margin: 4px 0 12px;
+  padding-left: 22px;
+  display: grid;
+  gap: 8px;
+}
+
+.getting-started li p {
   margin: 2px 0 0;
 }
