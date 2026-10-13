@@ -40,6 +40,30 @@ function toPublicUser(user: {
   };
 }
 
+// Password guessing guard, kept in the database because serverless instances don't share memory.
+// 5 free tries, then each wrong try locks the account for 1, 2, 4, 8, then 15 minutes at most.
+// A teacher's New Password clears the lock (routes/sections.ts).
+const FREE_TRIES = 5;
+const MAX_LOCK_MS = 15 * 60_000;
+
+function lockMessage(user: { lockedUntil: Date | null; role: string }) {
+  const minutes = user.lockedUntil ? Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60_000) : 0;
+  if (minutes <= 0) return null;
+  return `Too many wrong passwords. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}${user.role === "student" ? ", or ask your teacher for a new password" : ""}.`;
+}
+
+async function recordFailedPassword(userId: string) {
+  const { failedLogins } = await prisma.user.update({ where: { id: userId }, data: { failedLogins: { increment: 1 } } });
+  if (failedLogins >= FREE_TRIES) {
+    const lockMs = Math.min(60_000 * 2 ** (failedLogins - FREE_TRIES), MAX_LOCK_MS);
+    await prisma.user.update({ where: { id: userId }, data: { lockedUntil: new Date(Date.now() + lockMs) } });
+  }
+}
+
+async function clearFailedPasswords(user: { id: string; failedLogins: number }) {
+  if (user.failedLogins) await prisma.user.update({ where: { id: user.id }, data: { failedLogins: 0, lockedUntil: null } });
+}
+
 const registerTeacherSchema = z.object({
   username: usernameSchema,
   password: passwordSchema,
@@ -85,10 +109,17 @@ authRouter.post("/login", async (request, response, next) => {
     const payload = loginSchema.parse(request.body);
     const user = await prisma.user.findUnique({ where: { username: payload.username }, include: accountRelations });
 
+    const locked = user && lockMessage(user);
+    if (locked) {
+      response.status(429).json({ error: locked });
+      return;
+    }
     if (!user || !(await verifyPassword(payload.password, user.passwordHash))) {
+      if (user) await recordFailedPassword(user.id);
       response.status(401).json({ error: "Invalid username or password." });
       return;
     }
+    await clearFailedPasswords(user);
 
     const token = signToken({ sub: user.id, username: user.username, role: user.role });
     response.json({ token, user: toPublicUser(user) });
@@ -124,11 +155,17 @@ authRouter.post("/password", requireAuth, async (request, response, next) => {
   try {
     const payload = changePasswordSchema.parse(request.body);
     const user = await prisma.user.findUnique({ where: { id: request.user!.sub } });
+    const locked = user && lockMessage(user);
+    if (locked) {
+      response.status(429).json({ error: locked });
+      return;
+    }
     if (!user || !(await verifyPassword(payload.currentPassword, user.passwordHash))) {
+      if (user) await recordFailedPassword(user.id);
       response.status(400).json({ error: "Current password is incorrect." });
       return;
     }
-    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(payload.newPassword) } });
+    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(payload.newPassword), failedLogins: 0, lockedUntil: null } });
     response.json({ ok: true });
   } catch (error) {
     next(error);

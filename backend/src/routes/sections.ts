@@ -173,7 +173,7 @@ sectionsRouter.post("/:id/students/:studentId/password", async (request, respons
     const { password } = z.object({ password: passwordSchema }).parse(request.body);
     const updated = await prisma.user.updateMany({
       where: { id: request.params.studentId, sectionId: section.id, role: "student" },
-      data: { passwordHash: await hashPassword(password) },
+      data: { passwordHash: await hashPassword(password), failedLogins: 0, lockedUntil: null },
     });
     if (!updated.count) {
       response.status(404).json({ error: "Student not found." });

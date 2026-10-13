@@ -152,6 +152,8 @@ The sticky offset (`top: calc(var(--header-h, 140px) + 10px)`) is measured in JS
 
 Also 2026-10-13 (b43): `GettingStarted` (same file) shows 3 first-run tips on Home per role, dismissed per user per device (`tuklas-tips-done:<userId>`). Any signed-in user can change their own password from the account dialog (`POST /api/auth/password`, needs the current password; wrong current password is a 400, not 401, so it does not log the user out). Section screen has "Download Results (CSV)": one row per student and module with each stage's text, score and comment, UTF-8 BOM for Excel. Logout asks for confirmation when there are unsynced records (offline you cannot log back in).
 
+Password guessing guard (2026-10-13): `User.failedLogins` + `User.lockedUntil` (migration `20261013120000_add_login_lockout`), logic in `routes/auth.ts` (`lockMessage`/`recordFailedPassword`). Login and change-password: 5 free wrong tries, then a 429 lock of 1, 2, 4, 8, max 15 minutes; a correct login resets the count; a teacher's New Password clears the lock. Kept in the DB, not memory, because Vercel serverless instances do not share memory. Known trade-off: a classmate can lock someone out for up to 15 minutes by typing wrong passwords on purpose; the teacher's New Password undoes it.
+
 ### Backend structure
 
 Thin Express app (`app.ts`) mounting per-resource routers (`routes/*.ts`); `lib/auth.ts` (`requireAuth`/`requireRole`), `lib/validation.ts` (zod schemas), `lib/prisma.ts` (singleton client). `lib/database.ts`'s `hasDatabaseUrl()` gate degrades gracefully (fallback data or 503 on writes) without `DATABASE_URL`.
