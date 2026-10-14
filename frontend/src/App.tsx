@@ -96,6 +96,10 @@ function ModuleIcon({ moduleId }: { moduleId: string }) {
   return <span className={`module-icon subject-${groupId}`} aria-hidden="true"><Icon size={24} strokeWidth={2.2} /></span>;
 }
 
+// Workspace remounts on login (keyed by token), which drops any toast set just before it.
+// A message shown at login is parked here and shown by the new Workspace instead.
+let carriedToast = "";
+
 function App() {
   const token = useSyncExternalStore(subscribeSession, getToken);
   // Remount all account-owned state, forms, feedback and request effects.
@@ -396,17 +400,24 @@ function Workspace({ user }: { user: AuthUser | null }) {
     return () => { cancelled = true; window.clearInterval(interval); };
   }, [online, screen, role, user?.id]);
 
+  // Keep the saved class list in step with local changes (a new section, new students),
+  // not only with server loads, so returning to Classes never shows an older list.
+  const sectionsLoaded = useRef(false);
+  useEffect(() => {
+    if (sectionsLoaded.current && user) writeCache(user.id, "sections", sections);
+  }, [sections, user]);
+
   useEffect(() => {
     if (!(screen === "classes" && role === "teacher")) return;
     let cancelled = false;
     const userId = user?.id ?? "";
     const cached = readCache<SectionSummary[]>(userId, "sections");
-    if (cached) setSections(cached);
+    if (cached) { sectionsLoaded.current = true; setSections(cached); }
     listSections()
       .then(async (result) => {
         if (cancelled) return;
+        sectionsLoaded.current = true;
         setSections(result.sections);
-        writeCache(userId, "sections", result.sections);
         // Preload each section so opening one is instant. One at a time to go easy on the server.
         for (const section of result.sections) {
           if (cancelled) return;
@@ -481,6 +492,12 @@ function Workspace({ user }: { user: AuthUser | null }) {
     window.setTimeout(() => setToast(""), 2600);
   }
 
+  useEffect(() => {
+    if (!user || !carriedToast) return;
+    showToast(carriedToast);
+    carriedToast = "";
+  }, []);
+
   function goTo(nextScreen: Screen, push = true) {
     if (nextScreen === "modules" && push) { setSelectedQuarter(null); setSelectedGroup(null); setQuery(""); }
     if (push && screen !== nextScreen) setHistory((current) => [...current, screen]);
@@ -502,9 +519,9 @@ function Workspace({ user }: { user: AuthUser | null }) {
     setAuthLoading(true);
     try {
       const result = await apiLogin(loginUsername.trim(), loginPassword);
+      carriedToast = result.user.role === "teacher" ? "Teacher Mode opened." : "Student Mode opened.";
       setSession(result.token, result.user);
       setLoginPassword("");
-      showToast(result.user.role === "teacher" ? "Teacher Mode opened." : "Student Mode opened.");
     } catch (error) {
       setAuthError(error instanceof ApiError ? error.message : "Login failed. Check your connection.");
     } finally {
@@ -518,9 +535,9 @@ function Workspace({ user }: { user: AuthUser | null }) {
     setAuthLoading(true);
     try {
       const result = await registerTeacher(signupUsername.trim(), signupPassword, signupName.trim());
+      carriedToast = "Teacher account created.";
       setSession(result.token, result.user);
       setSignupPassword("");
-      showToast("Teacher account created.");
     } catch (error) {
       setAuthError(error instanceof ApiError ? error.message : "Sign up failed. Check your connection.");
     } finally {

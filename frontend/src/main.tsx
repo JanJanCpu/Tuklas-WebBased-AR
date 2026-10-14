@@ -37,9 +37,12 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
     }
   });
 
+  // Only an update needs the reload. On the very first visit there is no old version running,
+  // and reloading would wipe whatever the user is typing (found in the UAT run, 2026-10-15).
+  const hadController = Boolean(navigator.serviceWorker.controller);
   let reloading = false;
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (reloading) return;
+    if (!hadController || reloading) return;
     reloading = true;
     window.location.reload();
   });
