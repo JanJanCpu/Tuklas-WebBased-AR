@@ -12,6 +12,7 @@ import { ExperimentControls } from "./components/ExperimentControls";
 import { AccountDetails } from "./components/AccountDetails";
 import type { ActivityRecord, AuthUser, ClassProgressRecord, Feedback, LearningModule, Role, Screen, Section, SectionSummary, Stage, ViewMode } from "./types/domain";
 import AppInfo, { GettingStarted } from "./components/AppInfo";
+import { clearCache, readCache, writeCache } from "./lib/cache";
 import { Activity, BookOpen, ChevronLeft, ChevronRight, CircuitBoard, Download, KeyRound, Mail, MessageSquare, Earth, Eye, Home, Microscope, Printer, ScanLine, Settings, Thermometer, Users, type LucideIcon } from "lucide-react";
 
 // three.js (pulled in by ScienceScene) is a heavy dependency that only the
@@ -376,12 +377,16 @@ function Workspace({ user }: { user: AuthUser | null }) {
     if (!online || !(screen === "home" && role === "teacher")) return;
 
     let cancelled = false;
+    const userId = user?.id ?? "";
+    const cached = readCache<Awaited<ReturnType<typeof fetchClassProgress>>>(userId, "class-progress");
+    if (cached) { setStudents(cached.students); setClassRecords(cached.records); }
     const load = () => {
       fetchClassProgress()
         .then((result) => {
           if (cancelled) return;
           setStudents(result.students);
           setClassRecords(result.records);
+          writeCache(userId, "class-progress", result);
         })
         .catch(() => undefined);
     };
@@ -389,13 +394,28 @@ function Workspace({ user }: { user: AuthUser | null }) {
     load();
     const interval = window.setInterval(load, LIVE_REFRESH_MS);
     return () => { cancelled = true; window.clearInterval(interval); };
-  }, [online, screen, role]);
+  }, [online, screen, role, user?.id]);
 
   useEffect(() => {
-    if (screen === "classes" && role === "teacher") {
-      listSections().then((result) => setSections(result.sections)).catch(() => undefined);
-    }
-  }, [screen, role]);
+    if (!(screen === "classes" && role === "teacher")) return;
+    let cancelled = false;
+    const userId = user?.id ?? "";
+    const cached = readCache<SectionSummary[]>(userId, "sections");
+    if (cached) setSections(cached);
+    listSections()
+      .then(async (result) => {
+        if (cancelled) return;
+        setSections(result.sections);
+        writeCache(userId, "sections", result.sections);
+        // Preload each section so opening one is instant. One at a time to go easy on the server.
+        for (const section of result.sections) {
+          if (cancelled) return;
+          await getSection(section.id).then((data) => writeCache(userId, `section:${section.id}`, data)).catch(() => undefined);
+        }
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [screen, role, user?.id]);
 
   useEffect(() => {
     if (!online || !(screen === "section" && activeSectionId)) return;
@@ -409,6 +429,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
           setSectionStudents(result.students);
           setSectionRecords(result.records);
           setSectionFeedback(result.feedback);
+          writeCache(user?.id ?? "", `section:${activeSectionId}`, result);
         })
         .catch(() => undefined);
     };
@@ -416,7 +437,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
     load();
     const interval = window.setInterval(load, LIVE_REFRESH_MS);
     return () => { cancelled = true; window.clearInterval(interval); };
-  }, [online, screen, activeSectionId]);
+  }, [online, screen, activeSectionId, user?.id]);
 
   useEffect(() => {
     document.body.classList.toggle("login-open", !role);
@@ -525,11 +546,13 @@ function Workspace({ user }: { user: AuthUser | null }) {
   }
 
   function openSection(sectionId: string) {
+    // Show the last loaded copy right away; the section effect refreshes it from the server.
+    const cached = readCache<Awaited<ReturnType<typeof getSection>>>(user?.id ?? "", `section:${sectionId}`);
     setActiveSectionId(sectionId);
-    setActiveSection(null);
-    setSectionStudents([]);
-    setSectionRecords([]);
-    setSectionFeedback([]);
+    setActiveSection(cached?.section ?? null);
+    setSectionStudents(cached?.students ?? []);
+    setSectionRecords(cached?.records ?? []);
+    setSectionFeedback(cached?.feedback ?? []);
     setExpandedStudentId(null);
     setShowAddStudent(false);
     goTo("section");
@@ -714,6 +737,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
     const latest = navigator.onLine ? await syncUnsyncedRecords(records) : records;
     const unsynced = latest.filter((record) => !record.syncedAt).length;
     if (unsynced && !window.confirm(`${unsynced} answer${unsynced === 1 ? " has" : "s have"} not been sent to your teacher yet. ${navigator.onLine ? "Tap Cancel and wait a moment, or log out anyway; it will be sent next time you log in on this device." : "They stay saved on this device, but you need internet to log back in."} Log out anyway?`)) return;
+    clearCache();
     clearSession();
     setScreen("home");
     setHistory([]);
