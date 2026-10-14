@@ -12,7 +12,7 @@ Capstone: "Development of an Offline Augmented Reality Science Laboratory Simula
 
 This is **pre-defense**, in a dedicated polish window before the panel and before school testing:
 1. Thesis audit against the code, research instruments, and Chapter 4/5 drafted from real data only are done. Never fabricate results, scores or logs; every number in the thesis comes from the real pilot data.
-2. **Now (through the polish window):** the adviser/panel wants the AR more dynamic ("Pokemon GO level", less flat and static, replacing physical lab objects, hand/touch manipulation) and the general app UI polished, before the upgraded build is used for real SOP1/2/3 testing at Antonio A. Maceda Integrated School (letters 1/2/6 are for arranging that testing) and before the October defense. All of this lives on the fork branch `feature/dynamic-ar`. Latest build label: **b48** (fork `main` / `-nine` is still b40).
+2. **Now (through the polish window):** the adviser/panel wants the AR more dynamic ("Pokemon GO level", less flat and static, replacing physical lab objects, hand/touch manipulation) and the general app UI polished, before the upgraded build is used for real SOP1/2/3 testing at Antonio A. Maceda Integrated School (letters 1/2/6 are for arranging that testing) and before the October defense. All of this lives on the fork branch `feature/dynamic-ar`. Latest build label: **b48** (fork `main` / `-nine` fast-forwarded to b48 on 2026-10-15).
 3. **After school testing, before the defense:** the real data from that testing (curriculum validation, pretest/posttest, SUS) needs to go into Chapter 4/5 and the appendices, replacing/extending whatever pilot data is there now.
 
 Open items:
