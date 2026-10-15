@@ -1748,18 +1748,82 @@ input[type="range"] {
     font-size: 17px;
   }
 
-  .screen-stack {
-    width: min(960px, 100%);
-  }
-
-  .app-header,
-  .bottom-nav {
-    right: calc((100vw - 960px) / 2);
-    left: calc((100vw - 960px) / 2);
-  }
-
   .ar-frame-sticky {
     max-width: 620px;
+  }
+}
+
+/* Desktop: the phone's bottom tab bar becomes a left sidebar and the column widens, so a
+   computer screen is not a phone strip with empty space on both sides. `screen` keeps it off
+   printed slips. */
+@media screen and (min-width: 1024px) {
+  body:not(.login-open) {
+    padding-bottom: 0;
+    padding-left: 200px;
+  }
+
+  .bottom-nav {
+    top: 0;
+    right: auto;
+    left: 0;
+    width: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 24px 12px;
+    border-top: 0;
+    border-right: 1px solid var(--line);
+  }
+
+  .bottom-nav button {
+    display: flex;
+    justify-content: flex-start;
+    gap: 12px;
+    min-height: 48px;
+    padding: 0 14px;
+    font-size: 0.92rem;
+    cursor: pointer;
+  }
+
+  .screen-stack {
+    width: min(1120px, 100%);
+    padding: 24px 32px;
+  }
+
+  /* Login: intro on the left, form on the right. */
+  .landing-screen {
+    grid-template-columns: repeat(2, minmax(0, 460px));
+    grid-template-areas:
+      "hero auth"
+      "flow auth"
+      "marker auth"
+      "info info";
+    justify-content: center;
+    align-content: center;
+    column-gap: 40px;
+    row-gap: 18px;
+  }
+
+  .landing-hero { grid-area: hero; }
+  .landing-flow { grid-area: flow; }
+  .landing-marker { grid-area: marker; }
+
+  .landing-hero,
+  .landing-flow,
+  .landing-marker,
+  .auth-card {
+    width: 100%;
+    align-self: start;
+  }
+
+  .auth-card {
+    grid-area: auth;
+    padding: 28px;
+  }
+
+  .landing-screen .app-info {
+    grid-area: info;
+    margin-top: 12px;
   }
 }
 
