@@ -1825,6 +1825,26 @@ input[type="range"] {
     grid-area: info;
     margin-top: 12px;
   }
+  /* Observe: camera on the left, prompt/controls/trials on the right, so the pinned camera
+     never covers the answers. The sticky frame stays pinned while its grid row (as tall as
+     the right column) scrolls past. */
+  .observe-screen {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    align-items: start;
+  }
+
+  .observe-screen > * {
+    grid-column: 1 / -1;
+  }
+
+  .observe-screen > .ar-frame-sticky {
+    grid-column: 1;
+    max-width: none;
+  }
+
+  .observe-screen > .ar-frame-sticky + .panel-card {
+    grid-column: 2;
+  }
 }
 
 @media (max-width: 390px) {

@@ -1127,7 +1127,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
         )}
 
         {screen === "observe" && (
-          <section className="screen active">
+          <section className="screen active observe-screen">
             {isTeacherPreview && <p className="teacher-preview-note"><Eye size={16} strokeWidth={2.4} aria-hidden="true" /><span>Teacher Preview - trials run normally but aren't saved as student work.</span></p>}
             <article className="ar-panel">
               <div className="row-between">
