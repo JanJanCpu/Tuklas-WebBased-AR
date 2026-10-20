@@ -467,15 +467,11 @@ function Workspace({ user }: { user: AuthUser | null }) {
     setExplanation("");
     setReflection("");
 
+    setSelectedPredictions([]);
+
     if (isTeacherPreview) {
-      // Teacher Preview answers Predict and Explain correctly up front so a
-      // teacher can walk through the "ideal" run without re-deriving the
-      // science each time. Observe stays fully manual (see below).
-      setSelectedPredictions(activeModule.predictions.map((prediction) => prediction.choices[0]));
       setEvidence(getObservationModel(activeModule.id, defaults.controlA, defaults.controlB).recordText);
       setExplanation(activeModule.overview);
-    } else {
-      setSelectedPredictions([]);
     }
   }, [activeModule.id, isTeacherPreview]);
 
