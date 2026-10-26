@@ -1,4 +1,4 @@
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { ApiError, createSection, createSectionStudent, fetchClassProgress, fetchModules, fetchMyRecords, getSection, listSections, login as apiLogin, registerTeacher, resetStudentProgress, setStudentPassword as apiSetStudentPassword, submitFeedback, syncRecords } from "./lib/api";
 import { clearSession, getStoredUser, getToken, getSessionNotice, setSession, subscribeSession } from "./lib/auth";
@@ -143,6 +143,10 @@ function Workspace({ user }: { user: AuthUser | null }) {
   // Generated logins waiting to be printed. Memory only: passwords are hashed server-side and
   // must never be written to storage on a shared classroom device.
   const [slips, setSlips] = useState<{ name: string; section: string; username: string; password: string }[]>([]);
+  const [singleSlip, setSingleSlip] = useState<(typeof slips)[number] | null>(null);
+  const [slipStudent, setSlipStudent] = useState<AuthUser | null>(null);
+  const slipDialog = useRef<HTMLDialogElement>(null);
+  const printableSlips = singleSlip ? [singleSlip] : slips;
   const [sectionStudents, setSectionStudents] = useState<AuthUser[]>([]);
   const [sectionRecords, setSectionRecords] = useState<ClassProgressRecord[]>([]);
   const [sectionFeedback, setSectionFeedback] = useState<Feedback[]>([]);
@@ -642,13 +646,14 @@ function Workspace({ user }: { user: AuthUser | null }) {
     }
     try {
       const result = await createSectionStudent(activeSectionId, studentUsername.trim(), studentPassword, studentName.trim());
+      setSlips((current) => [...current, { name: result.user.name, section: activeSection?.name ?? "", username: result.user.username, password: studentPassword }]);
       setSectionStudents((current) => [result.user, ...current]);
       setSections((current) => current.map((section) => (section.id === activeSectionId ? { ...section, studentCount: section.studentCount + 1 } : section)));
       setStudentUsername("");
       setStudentPassword("");
       setStudentName("");
       setShowAddStudent(false);
-      showToast(`Student account "${result.user.username}" created.`);
+      showToast(`Student account "${result.user.username}" created. Print the login slip.`);
     } catch (error) {
       setStudentFormError(error instanceof ApiError ? error.message : "Could not create student account.");
     }
@@ -737,8 +742,22 @@ function Workspace({ user }: { user: AuthUser | null }) {
 
   function printSlips() {
     document.body.classList.add("printing-slips");
-    window.addEventListener("afterprint", () => document.body.classList.remove("printing-slips"), { once: true });
+    window.addEventListener("afterprint", () => {
+      document.body.classList.remove("printing-slips");
+      setSingleSlip(null);
+    }, { once: true });
     window.print();
+  }
+
+  function printStudentSlip(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!slipStudent || !event.currentTarget.reportValidity()) return;
+    const password = String(new FormData(event.currentTarget).get("password") ?? "");
+    const slip = { name: slipStudent.name, section: activeSection?.name ?? "", username: slipStudent.username, password };
+    slipDialog.current?.close();
+    // Commit the selected slip before the browser captures the page for printing.
+    flushSync(() => { setSingleSlip(slip); setSlipStudent(null); });
+    printSlips();
   }
 
   async function logout() {
@@ -1424,6 +1443,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
                         <span><small>{student.username}</small><p>{student.name}</p></span>
                         <span className={`disclosure-chevron ${isExpanded ? "open" : ""}`} aria-hidden="true"><ChevronRight size={18} strokeWidth={2.4} /></span>
                       </button>
+                      <button type="button" className="secondary-button" aria-label={`Print slip for ${student.name}`} onClick={() => { setSlipStudent(student); slipDialog.current?.showModal(); }}><Printer size={16} />Print Slip</button>
                       {isExpanded && (
                         <div className="student-progress-panel">
                           {modules.map((module) => {
@@ -1510,9 +1530,21 @@ function Workspace({ user }: { user: AuthUser | null }) {
       </nav>
 
       <div className={`toast ${toast ? "show" : ""}`} role="status" aria-live="polite">{toast}</div>
-      {slips.length > 0 && createPortal(
+      <dialog id="student-slip-dialog" className="account-dialog" ref={slipDialog} aria-labelledby="student-slip-title" onClose={(event) => { event.currentTarget.querySelector("form")?.reset(); setSlipStudent(null); }}>
+        <form className="auth-form" onSubmit={printStudentSlip}>
+          <h2 id="student-slip-title">Print Student Slip</h2>
+          <p>{slipStudent?.name} <small>@{slipStudent?.username}</small></p>
+          <p id="student-slip-hint">Enter the student's current password. It will be printed as typed; the app cannot check it here.</p>
+          <label className="field-label">Student password<input name="password" type="password" autoComplete="off" required aria-describedby="student-slip-hint" /></label>
+          <div className="row-between">
+            <button type="button" className="secondary-button" onClick={() => slipDialog.current?.close()}>Cancel</button>
+            <button type="submit" className="primary-button"><Printer size={18} />Print Slip</button>
+          </div>
+        </form>
+      </dialog>
+      {printableSlips.length > 0 && createPortal(
         <div className="slip-sheet">
-          {slips.map((slip) => (
+          {printableSlips.map((slip) => (
             <div className="slip" key={slip.username}>
               <small>Tuklas AR Science Lab{slip.section ? ` - ${slip.section}` : ""}</small>
               <strong>{slip.name}</strong>
