@@ -27,7 +27,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     if (response.status === 401 && token) clearSession(true);
     const body = await response.json().catch(() => null);
-    throw new ApiError(response.status, body?.error || `API request failed: ${response.status}`);
+    throw new ApiError(response.status, body?.error || "Could not complete the request. Please try again.");
   }
 
   const body = await response.json() as T;

@@ -320,7 +320,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
         if (Boolean(tracked) !== markerVisible) {
           markerVisible = Boolean(tracked);
           onMarkerChange?.(markerVisible);
-          onArStatus?.(markerVisible ? "Tuklas marker detected." : "Looking for the Tuklas marker...");
+          onArStatus?.(markerVisible ? "Marker detected. Keep it in view." : "Point the camera at the printed Tuklas marker.");
         }
       }
       if (viewMode === "ar") {
@@ -379,7 +379,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
       markerRoots.forEach(root => { root.visible = false; });
       onArReady?.(false);
       onMarkerChange?.(false);
-      onArStatus?.("Loading AR marker tracking...");
+      onArStatus?.("Starting the camera. Allow camera access when asked.");
 
       loadArToolkit()
         .then((THREEx) => {
@@ -412,7 +412,7 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
               video.muted = true;
               video.playsInline = true;
               void video.play().catch(() => {
-                if (!cancelled) onArStatus?.("Camera playback paused. Switch to 3D and reopen the camera.");
+                if (!cancelled) onArStatus?.("Camera paused. Choose Use 3D Model, then Use Camera to restart it.");
               });
               if (fpsEnabled) startFpsHud();
               context.init(() => {
@@ -432,10 +432,10 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
                   if (!cancelled && pending === 0) {
                     if (failed) {
                       onArReady?.(false);
-                      onArStatus?.("Marker file failed to load. Prepare offline files again or use 3D mode.");
+                      onArStatus?.("Could not load the marker file. Choose Use 3D Model, or prepare the offline files again in Settings.");
                     } else {
                       onArReady?.(true);
-                      onArStatus?.("Looking for the Tuklas marker...");
+                      onArStatus?.("Point the camera at the printed Tuklas marker.");
                     }
                   }
                   // Let AR.js's promise continuation register this ID before disposal.
@@ -456,14 +456,14 @@ export function ScienceScene({ moduleId, controlA, controlB, lab, trialPulse, vi
             (error: { message?: string }) => {
               if (cancelled) return;
               onArReady?.(false);
-              onArStatus?.(error.message || "Camera failed to start.");
+              onArStatus?.(`${error.message || "The camera could not start."} Choose Use 3D Model to continue without the camera.`);
             },
           );
         })
         .catch(() => {
           if (cancelled) return;
           onArReady?.(false);
-          onArStatus?.("AR.js failed to load.");
+          onArStatus?.("Camera mode could not load. Choose Use 3D Model to continue.");
         });
     }
 

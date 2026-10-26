@@ -45,6 +45,6 @@ export function cacheAccount(token: string, user: AuthUser) {
 export function clearSession(expired = false) {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
-  sessionNotice = expired ? "Your session expired. Sign in again to sync your saved work." : "";
+  sessionNotice = expired ? "Your session expired. Log in again to send your saved work." : "";
   window.dispatchEvent(new Event(SESSION_EVENT));
 }

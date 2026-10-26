@@ -123,10 +123,10 @@ export function AccountDetails({ user }: { user: AuthUser }) {
           <summary>Change password</summary>
           <form className="auth-form" onSubmit={handleChangePassword}>
             <label className="field-label">Current password<input name="current" type="password" autoComplete="current-password" required /></label>
-            <label className="field-label">New password<input name="next" type="password" autoComplete="new-password" required minLength={8} /></label>
+            <label className="field-label">New password (at least 8 characters)<input name="next" type="password" autoComplete="new-password" required minLength={8} /></label>
             <label className="field-label">Confirm new password<input name="confirm" type="password" autoComplete="new-password" required minLength={8} /></label>
             {passwordStatus && <p role="status">{passwordStatus}</p>}
-            <button className="primary-button" type="submit" disabled={passwordSaving}>{passwordSaving ? "Saving..." : "Save New Password"}</button>
+            <button className="primary-button" type="submit" disabled={passwordSaving}>{passwordSaving ? "Changing password..." : "Save New Password"}</button>
             {user.role === "student" && <p className="muted">Forgot it later? Your teacher can give you a new one.</p>}
           </form>
         </details>

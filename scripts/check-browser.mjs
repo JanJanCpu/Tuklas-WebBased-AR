@@ -33,7 +33,7 @@ socket.addEventListener('message', event => {
 const send = (method, params = {}) => new Promise((resolve, reject) => { const id = ++sequence; pending.set(id, { resolve, reject }); socket.send(JSON.stringify({ id, method, params })); });
 const evaluate = async expression => { const r = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true, userGesture: true }); if (r.exceptionDetails) throw Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text); return r.result?.value; };
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-async function waitFor(expression, timeout = 20000) { const end = Date.now() + timeout; while (Date.now() < end) { if (await evaluate(expression)) return; await sleep(150); } throw Error(`Timed out: ${expression}\n${await evaluate('document.body.innerText')}`); }
+async function waitFor(expression, timeout = 20000) { const end = Date.now() + timeout; while (Date.now() < end) { if (await evaluate(`document.body && (${expression})`)) return; await sleep(150); } throw Error(`Timed out: ${expression}\n${await evaluate('document.body?.innerText')}`); }
 const click = async text => { await evaluate(`(() => { const button = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === ${JSON.stringify(text)}); if (!button) throw Error('Missing button: ' + ${JSON.stringify(text)}); button.click(); })()`); await sleep(130); };
 const card = async text => { await evaluate(`(() => { const button = [...document.querySelectorAll('.module-card')].find(b => b.textContent.includes(${JSON.stringify(text)})); if (!button) throw Error('Missing card'); button.click(); })()`); await sleep(130); };
 await send('Page.enable'); await send('Runtime.enable');
@@ -66,7 +66,7 @@ if (offline) {
   await waitFor(`document.body.innerText.includes('Preview Lessons')`);
   await click('Settings');
   await evaluate(`[...document.querySelectorAll('button')].find(b => b.textContent.includes('Prepare for Offline Use')).click()`);
-  await waitFor(`document.body.innerText.includes('Ready: 12 experiments cached')`);
+  await waitFor(`document.body.innerText.includes('Ready: 12 experiments saved for offline use')`);
   const cached = await evaluate(`(async () => { const keys = await caches.keys(); const cache = await caches.open(keys.find(k => k.startsWith('tuklas-webar-'))); return (await cache.keys()).map(r => new URL(r.url).pathname); })()`);
   assert.ok(cached.some(path => path.includes('ScienceScene-')), 'Unvisited 3D chunk is precached');
   assert.ok(cached.some(path => path.includes('ar-threex-')), 'Unvisited AR chunk is precached');
@@ -91,7 +91,8 @@ for (const experiment of modules) {
   await card(experiment.quarter);
   await card(experiment.moduleTitle);
   await card(experiment.title);
-  await click('Next');
+  await evaluate(`document.querySelectorAll('fieldset input[type=radio]:first-of-type').forEach(input => input.click())`);
+  await click('Preview Observation');
   await waitFor(`document.querySelector('.three-scene canvas') !== null`);
   if (experiment.id === 'inertia') assert.equal(await evaluate(`!!document.querySelector('.fallback-mode') && !document.querySelector('.camera-status')`), true, 'First experiment opens in 3D even with a legacy camera preference');
   if (await evaluate(`document.body.innerText.includes('Use 3D Model')`)) await click('Use 3D Model');
@@ -100,7 +101,13 @@ for (const experiment of modules) {
   await evaluate(`(() => { for (const input of document.querySelectorAll('input[type=range]')) { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, input.max); input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })); } })()`);
   await sleep(200); await click('Reset model');
   if (['series', 'parallel', 'home-circuit'].includes(experiment.id)) await click('Close switch');
-  if (experiment.id === 'earth-scale') for (const layer of ['Inner core', 'Outer core', 'Mantle', 'Crust']) await click(`Add ${layer}`);
+  if (experiment.id === 'earth-scale') {
+    await click('Add Crust');
+    assert.equal(await evaluate(`document.querySelector('.data-readout').textContent.includes('0/5 compositional layers')`), true, 'Out-of-order layer must not advance assembly');
+    for (const layer of ['Inner core', 'Outer core', 'Lower mantle', 'Upper mantle', 'Crust']) await click(`Add ${layer}`);
+    await waitFor(`document.querySelector('.data-readout').textContent.includes('5/5 compositional layers')`);
+    assert.equal(await evaluate(`[...document.querySelectorAll('.earth-workbench button')].filter(b => b.textContent.startsWith('Add ')).every(b => b.disabled)`), true, 'Completed assembly disables layer buttons');
+  }
   if (experiment.id === 'bonding') {
     await click('Transfer to Cl');
     await waitFor(`document.querySelector('.data-readout').textContent.includes('1 electron transferred')`);
@@ -115,7 +122,7 @@ for (const experiment of modules) {
   await sleep(250);
   await writeFile(`.browser-check/screens/${experiment.id}-3d.png`, Buffer.from((await send('Page.captureScreenshot')).data, 'base64'));
   await click('Use Camera');
-  await waitFor(`document.querySelector('.camera-status')?.textContent === 'Tuklas marker detected.'`, 30000);
+  await waitFor(`document.querySelector('.camera-status')?.textContent === 'Marker detected. Keep it in view.'`, 30000);
   await waitFor(`[...document.querySelectorAll('button')].some(b => b.textContent === 'Run Trial' && !b.disabled)`);
   await evaluate(`document.querySelector('.ar-frame').scrollIntoView({ block: 'center' })`);
   await sleep(350);
@@ -145,7 +152,9 @@ if (offline) {
       ready();
     }); };
   })()`);
-  await click('Preview Lessons'); await card(modules[0].quarter); await card(modules[0].moduleTitle); await card(modules[0].title); await click('Next');
+  await click('Preview Lessons'); await card(modules[0].quarter); await card(modules[0].moduleTitle); await card(modules[0].title);
+  await evaluate(`document.querySelectorAll('fieldset input[type=radio]:first-of-type').forEach(input => input.click())`);
+  await click('Preview Observation');
   await waitFor('window.__markerPending === true');
   await click('Home');
   await evaluate('window.__releaseMarker()');
@@ -161,7 +170,7 @@ await send('Page.reload');
 await waitFor(`document.body.innerText.includes('Progress Summary')`);
 await click('Modules'); await card(modules[0].quarter); await card(modules[0].moduleTitle); await card(modules[0].title);
 await evaluate(`document.querySelectorAll('fieldset input[type=radio]:first-of-type').forEach(input => { if (!document.querySelector('input[name="'+input.name+'"]:checked')) input.click(); })`);
-await click('Next');
+await click('Save Prediction');
 await waitFor(`document.querySelector('.three-scene canvas') !== null`);
 await click('Run Trial'); await click('Run Trial');
 const recordCheck = expression => `(async () => {
@@ -174,9 +183,9 @@ const recordCheck = expression => `(async () => {
 })()`;
 const studentRecords = 'savedRecords';
 await waitFor(recordCheck(`${studentRecords}.filter(r => r.moduleId === 'inertia' && r.stage === 'Observe').length === 1`));
-await click('Continue');
+await click('Continue to Explain');
 await evaluate(`document.querySelectorAll('textarea:not([readonly])').forEach(input => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, 'At zero net force, the stationary cart remained at rest.'); input.dispatchEvent(new Event('input', { bubbles: true })); })`);
-await click('Submit');
+await click('Save Explanation');
 await waitFor(`document.body.innerText.includes('Great work!')`);
 assert.deepEqual(await evaluate(recordCheck(`${studentRecords}.map(r => r.stage)`)), ['Predict', 'Observe', 'Explain']);
 await click('Modules'); await card(modules[1].quarter); await card(modules[1].moduleTitle); await card(modules[1].title);
@@ -191,11 +200,12 @@ if (offline) {
   await send('Page.reload');
   await waitFor(`document.body.innerText.includes('Progress Summary')`);
   await click('Settings');
-  await waitFor(`document.querySelectorAll('.record-card').length === 3`);
+  await waitFor(`document.querySelectorAll('.saved-entry').length === 3`);
+  assert.equal(await evaluate(`document.querySelectorAll('.record-card.saved-module').length`), 1, 'Saved answers are grouped under their experiment');
   assert.equal(await evaluate(recordCheck(`${studentRecords}.every(r => !r.syncedAt)`)), true);
   assert.equal(await evaluate('window.__records.length'), 0, 'No offline uploads');
   await evaluate(`window.__export = null; const create = URL.createObjectURL.bind(URL); URL.createObjectURL = blob => { window.__export = blob.text(); return create(blob); };`);
-  await click('Export JSON');
+  await click('Download Saved Work (JSON)');
   assert.equal(JSON.parse(await evaluate('window.__export')).length, 3);
   for (const path of ['/assets/tuklas-marker.png', '/assets/tuklas-marker.patt', '/assets/camera_para.dat']) {
     assert.equal(await evaluate(`fetch(${JSON.stringify(path)}).then(r => r.ok)`), true);
@@ -208,8 +218,8 @@ if (offline) {
   console.log('PASS reconnect uploads all three queued stages (mock API).');
   await evaluate(`(async () => { for (const name of await caches.keys()) { if (name.startsWith('tuklas-webar-')) await (await caches.open(name)).delete('/assets/tuklas-marker.patt'); } })()`);
   await evaluate(`[...document.querySelectorAll('button')].find(b => b.textContent.includes('Prepare for Offline Use')).click()`);
-  await waitFor(`document.body.innerText.includes('Offline preparation failed. Check connection and browser storage.')`);
-  assert.equal(await evaluate(`document.body.innerText.includes('Ready: 12 experiments cached')`), false);
+  await waitFor(`document.body.innerText.includes('Could not finish saving offline files.')`);
+  assert.equal(await evaluate(`document.body.innerText.includes('Ready: 12 experiments saved for offline use')`), false);
   assert.deepEqual(errors, []);
   console.log('PASS missing offline file reports preparation failure instead of Ready.');
 }
@@ -243,7 +253,7 @@ if (offline) {
   assert.equal(await evaluate(`document.body.innerText.includes('Private student A feedback')`), false);
   console.log('PASS teacher reset unlocks an open activity and clears feedback without navigation.');
   await evaluate(`window.__originalPut = IDBObjectStore.prototype.put; IDBObjectStore.prototype.put = function() { throw new DOMException('Test quota limit', 'QuotaExceededError'); }; document.querySelectorAll('fieldset input[type=radio]:first-of-type').forEach(input => { if (!document.querySelector('input[name="'+input.name+'"]:checked')) input.click(); });`);
-  await click('Next');
+  await click('Save Prediction');
   await waitFor(`document.body.innerText.includes('Could not save your work')`);
   assert.equal(await evaluate(`!!document.querySelector('.prediction-question') && document.querySelectorAll('input[type=radio]:checked').length > 0`), true);
   assert.equal(await evaluate(recordCheck('savedRecords.length')), 0);
@@ -265,8 +275,6 @@ if (offline) {
     };
   })()`);
   await waitFor('window.__heldMine === true');
-  await click('Logout');
-  await waitFor(`!!document.querySelector('.auth-form')`);
   await evaluate(`localStorage.setItem('tuklas-user', JSON.stringify({ id: 'account-b', username: 'b', name: 'Student B', role: 'student', sectionId: null })); localStorage.setItem('tuklas-token', 'account-b-token'); localStorage.setItem('tuklas-view-mode', 'fallback'); window.__holdMine = false; window.dispatchEvent(new Event('storage'));`);
   await waitFor(`document.body.innerText.includes('Progress Summary')`);
   await evaluate('window.__releaseMine()');
@@ -278,7 +286,7 @@ if (offline) {
   console.log('PASS account switch rejects delayed records and feedback from the old account.');
 
   await evaluate(`document.querySelectorAll('fieldset input[type=radio]:first-of-type').forEach(input => { if (!document.querySelector('input[name="'+input.name+'"]:checked')) input.click(); })`);
-  await click('Next');
+  await click('Save Prediction');
   await waitFor(recordCheck('savedRecords.length === 1'));
   await evaluate(`window.__lastUserId = 'account-b'; window.__expireSession = true;`);
   await waitFor(`!!document.querySelector('.auth-form') && document.body.innerText.includes('Your session expired')`);

@@ -2,7 +2,7 @@ import { ChevronRight } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 // Shown in Settings and in the fps HUD; bump on every build you want to confirm on a phone.
-export const BUILD = "b56";
+export const BUILD = "b57";
 const UPDATED = "October 13, 2026";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -16,12 +16,12 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 const faqs: [string, string][] = [
   ["How do I get an account?", "Students do not sign up. Your teacher creates your account and gives you a login slip with your username and password. Teachers can create their own account on the login screen."],
-  ["I forgot my password.", "Ask your teacher. They can give you a new password from their class list. The old password stops working right away."],
-  ["Does it work without internet?", "Yes. Open the app once while online, go to Settings and tap Prepare for Offline Use. After that you can log in and do activities offline. Your work is saved on the device and sent to your teacher the next time you are online."],
+  ["I forgot my password.", "Students: ask your teacher to choose New Password in your section. Your old password will stop working. Teachers who cannot log in can contact the researchers through PLM."],
+  ["Does it work without internet?", "Yes, after setup. Log in while online, open Settings and choose Prepare for Offline Use. Stay logged in when you go offline. Your answers stay on this device and send automatically when you reconnect. You need internet to log in again after logging out."],
   ["What is the marker for?", "The printed TUKLAS marker is where the experiment appears in camera mode. Point the camera at it and keep the whole marker in view. One printed marker can be shared by a group."],
   ["Do I need a camera or printed marker?", "No. Experiments open in 3D Model Mode without a camera or marker. To try AR, tap Use Camera and point it at the printed TUKLAS marker. Tap Use 3D Model to return."],
   ["Can I change my answer after I submit?", "No. Each Predict, Observe and Explain answer is locked once saved, so your prediction stays your own. If you need to redo a lesson, ask your teacher to reset your progress."],
-  ["The app looks old or broken after an update.", "Close the app fully and open it again while online. If that does not help, clear the site data in your browser settings and log in again."],
+  ["The app looks old or broken after an update.", "Close the app fully and reopen it while online. Before clearing site data, open Settings, choose Send Saved Work, and confirm that no answers are waiting to send. Clearing site data deletes unsent answers and logs you out."],
   ["Why is the experiment slow on my phone?", "The app lowers the graphics quality on its own when a phone is slow. Close other apps and keep the marker steady and well lit."],
 ];
 
@@ -70,9 +70,9 @@ export default function AppInfo() {
 
 const tips = {
   student: [
-    ["Predict", "Before each experiment, write what you think will happen. There is no wrong prediction."],
+    ["Predict", "Choose what you think will happen before running a trial. Save your prediction to continue."],
     ["Observe", "The 3D model opens first. Drag and tap the parts to run trials. To try AR, tap Use Camera and point it at the printed TUKLAS marker."],
-    ["Explain", "Compare what you saw with your prediction. Your answers go to your teacher, even if you were offline."],
+    ["Explain", "Use your observations to explain the result. Offline answers stay on this device and send when you reconnect."],
   ],
   teacher: [
     ["Try a lesson", "Tap Preview Lessons and choose an experiment. The 3D model needs no camera or marker, and preview work is not saved as student work."],

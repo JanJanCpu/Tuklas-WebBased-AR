@@ -34,9 +34,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       <div className="app-crash-screen">
         <article className="panel-card">
           <p className="eyebrow">Something went wrong</p>
-          <h2>The app hit an unexpected error</h2>
-          <p>Your saved progress is safe on this device. Reloading usually fixes this.</p>
-          <button className="primary-button" onClick={() => window.location.reload()}>Reload</button>
+          <h2>The app could not continue</h2>
+          <p>Reload the app to try again. Answers you were still typing may need to be entered again.</p>
+          <button className="primary-button" onClick={() => window.location.reload()}>Reload App</button>
         </article>
       </div>
     );

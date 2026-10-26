@@ -186,8 +186,8 @@ function Workspace({ user }: { user: AuthUser | null }) {
   const [experimentTrials, setExperimentTrials] = useState<ExperimentTrial[]>([]);
   const [toast, setToast] = useState("");
   const [online, setOnline] = useState(navigator.onLine);
-  const [offlineStatus, setOfflineStatus] = useState("Cache app shell, twelve experiments, marker, and local records support.");
-  const [deviceStatus, setDeviceStatus] = useState("Camera, WebGL, service worker, and storage readiness.");
+  const [offlineStatus, setOfflineStatus] = useState("Download the app, experiments and marker so you can work without internet.");
+  const [deviceStatus, setDeviceStatus] = useState("Check camera access, 3D graphics, offline support and browser storage.");
   const [cameraStatus, setCameraStatus] = useState("Camera is off.");
   const [cameraReady, setCameraReady] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
@@ -515,11 +515,11 @@ function Workspace({ user }: { user: AuthUser | null }) {
     setAuthLoading(true);
     try {
       const result = await apiLogin(loginUsername.trim(), loginPassword);
-      carriedToast = result.user.role === "teacher" ? "Teacher Mode opened." : "Student Mode opened.";
+      carriedToast = result.user.role === "teacher" ? "Logged in as a teacher." : "Logged in as a student.";
       setSession(result.token, result.user);
       setLoginPassword("");
     } catch (error) {
-      setAuthError(error instanceof ApiError ? error.message : "Login failed. Check your connection.");
+      setAuthError(error instanceof ApiError ? error.message : "Could not log in. Connect to the internet and try again.");
     } finally {
       setAuthLoading(false);
     }
@@ -535,7 +535,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
       setSession(result.token, result.user);
       setSignupPassword("");
     } catch (error) {
-      setAuthError(error instanceof ApiError ? error.message : "Sign up failed. Check your connection.");
+      setAuthError(error instanceof ApiError ? error.message : "Could not create your account. Check your connection and try again.");
     } finally {
       setAuthLoading(false);
     }
@@ -554,7 +554,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
       setNewSectionName("");
       showToast(`Section "${result.section.name}" created.`);
     } catch (error) {
-      setSectionFormError(error instanceof ApiError ? error.message : "Could not create section.");
+      setSectionFormError(error instanceof ApiError ? error.message : "Could not create the section. Check your connection and try again.");
     }
   }
 
@@ -577,7 +577,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
   // (see the fetchMyRecords effect above), unlocking the screen there too.
   async function handleResetProgress(studentId: string, moduleId?: string) {
     const confirmed = window.confirm(
-      moduleId ? "Reset this student's progress for this experiment? They'll be able to redo it." : "Reset ALL of this student's progress? They'll be able to redo every module.",
+      moduleId ? "Reset this experiment for the student? This deletes their submitted answers and teacher feedback for this experiment so they can start again. This cannot be undone." : "Reset all experiments for this student? This deletes all their submitted answers and teacher feedback so they can start again. This cannot be undone.",
     );
     if (!confirmed) return;
 
@@ -587,7 +587,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
       setSectionFeedback((current) => current.filter((entry) => !(entry.studentId === studentId && (!moduleId || entry.moduleId === moduleId))));
       showToast("Progress reset.");
     } catch (error) {
-      showToast(error instanceof ApiError ? error.message : "Could not reset progress.");
+      showToast(error instanceof ApiError ? error.message : "Could not reset progress. Reconnect and try again.");
     }
   }
 
@@ -622,7 +622,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
     }
     const score = feedbackScore.trim() ? Number(feedbackScore) : null;
     if (score !== null && (Number.isNaN(score) || score < 0 || score > 100)) {
-      setFeedbackFormError("Score must be a number from 0 to 100 (or left blank).");
+      setFeedbackFormError("Enter a score from 0 to 100, or leave the score blank.");
       return;
     }
 
@@ -632,7 +632,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
       showToast("Feedback saved.");
       goBack();
     } catch (error) {
-      setFeedbackFormError(error instanceof ApiError ? error.message : "Could not save feedback.");
+      setFeedbackFormError(error instanceof ApiError ? error.message : "Could not confirm that feedback was saved. Check your connection and try again.");
     }
   }
 
@@ -655,7 +655,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
       setShowAddStudent(false);
       showToast(`Student account "${result.user.username}" created. Print the login slip.`);
     } catch (error) {
-      setStudentFormError(error instanceof ApiError ? error.message : "Could not create student account.");
+      setStudentFormError(error instanceof ApiError ? error.message : "Could not create the student account. Check your connection and try again.");
     }
   }
 
@@ -696,8 +696,8 @@ function Workspace({ user }: { user: AuthUser | null }) {
     setSections((current) => current.map((section) => (section.id === activeSectionId ? { ...section, studentCount: section.studentCount + created.length } : section)));
     // Leave only the failures in the box so the teacher can retry them.
     setBulkNames(failed.join("\n"));
-    if (failed.length) setStudentFormError(`${failed.length} could not be created (still in the box). Check your connection and try again.`);
-    showToast(`${created.length} student account${created.length === 1 ? "" : "s"} created. Print the login slips.`);
+    if (failed.length) setStudentFormError(`Could not confirm ${failed.length} student account${failed.length === 1 ? "" : "s"}. Check the enrolled students before retrying the names still in the box.`);
+    showToast(`${created.length} student account${created.length === 1 ? "" : "s"} created.`);
   }
 
   async function handleNewPassword(student: AuthUser) {
@@ -707,9 +707,9 @@ function Workspace({ user }: { user: AuthUser | null }) {
     try {
       await apiSetStudentPassword(activeSectionId, student.id, password);
       setSlips((current) => [...current.filter((slip) => slip.username !== student.username), { name: student.name, section: activeSection?.name ?? "", username: student.username, password }]);
-      showToast(`New password for ${student.username}: ${password}`);
+      showToast(`New login slip ready for ${student.username}.`);
     } catch (error) {
-      showToast(error instanceof ApiError ? error.message : "Could not set a new password.");
+      showToast(error instanceof ApiError ? error.message : "Password change unconfirmed. Reconnect and use New Password again.");
     }
   }
 
@@ -791,7 +791,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
     try {
       return await session.save(record);
     } catch {
-      showToast("Could not save your work. Check browser storage and try again.");
+      showToast("Could not save your work. Keep this screen open and check browser storage.");
       return null;
     } finally {
       pendingSaves.current.delete(saveKey);
@@ -811,40 +811,38 @@ function Workspace({ user }: { user: AuthUser | null }) {
     setOfflineStatus("Downloading and verifying offline files...");
     try {
       await prepareOfflineFiles();
-      const estimate = await navigator.storage?.estimate?.();
-      const quotaMb = estimate?.quota ? `${Math.round(estimate.quota / 1024 / 1024)} MB storage quota` : "storage ready";
-      setOfflineStatus(`Ready: ${modules.length} experiments cached; ${quotaMb}.`);
-      showToast("Offline files prepared. Reopen once in airplane mode to verify.");
+      setOfflineStatus(`Ready: ${modules.length} experiments saved for offline use. Stay logged in.`);
+      showToast("Offline files saved. Try reopening the app in airplane mode.");
     } catch {
-      setOfflineStatus("Offline preparation failed. Check connection and browser storage.");
-      showToast("Offline preparation failed.");
+      setOfflineStatus("Could not finish saving offline files. Check your connection and browser storage permissions, then try again.");
+      showToast("Offline setup did not finish. Try again in Settings.");
     }
   }
 
   async function checkDevice() {
     const secure = location.protocol === "https:" || location.hostname === "localhost";
     const hasCameraApi = Boolean(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-    const camera = hasCameraApi ? (secure ? "camera permission available" : "HTTPS needed for camera") : "camera API unavailable";
-    const webgl = document.createElement("canvas").getContext("webgl") ? "WebGL ready" : "WebGL unavailable";
-    const serviceWorker = "serviceWorker" in navigator ? "service worker ready" : "service worker unavailable";
+    const camera = hasCameraApi ? (secure ? "Camera access supported" : "Use an HTTPS link for the camera") : "Camera access unavailable in this browser";
+    const webgl = document.createElement("canvas").getContext("webgl") ? "3D graphics supported" : "3D graphics unavailable";
+    const serviceWorker = "serviceWorker" in navigator ? "Offline support detected" : "Offline support unavailable";
     const estimate = await navigator.storage?.estimate?.();
-    const storage = estimate?.quota ? `${Math.round(estimate.quota / 1024 / 1024)} MB storage quota` : "storage ready";
+    const storage = estimate?.quota ? `${Math.round(estimate.quota / 1024 / 1024)} MB browser storage limit` : "Storage limit unavailable";
     const result = `${camera}; ${webgl}; ${serviceWorker}; ${storage}`;
     setDeviceStatus(result);
-    showToast(result);
+    showToast("Device check finished. Review the results above.");
   }
 
   async function handleSync() {
     const before = records.filter((record) => !record.syncedAt).length;
     if (!before) {
-      showToast("Nothing to sync - everything is already saved to your account.");
+      showToast("No saved answers are waiting to send.");
       return;
     }
     const next = await syncUnsyncedRecords(records);
     const after = next.filter((record) => !record.syncedAt).length;
-    if (after === 0) showToast(`${before} record${before === 1 ? "" : "s"} synced.`);
-    else if (after < before) showToast(`${before - after} of ${before} records synced. The rest will retry automatically.`);
-    else showToast("Sync failed. Records are still saved offline and will retry automatically.");
+    if (after === 0) showToast(`${before} saved answer${before === 1 ? "" : "s"} sent.`);
+    else if (after < before) showToast(`${before - after} of ${before} answers sent. Remaining answers will retry online.`);
+    else showToast("Could not confirm sending. Saved answers will retry online.");
   }
 
   function getExperimentTrial() {
@@ -889,15 +887,16 @@ function Workspace({ user }: { user: AuthUser | null }) {
               <label className="field-label">Password<input type="password" autoComplete="current-password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} required /></label>
               {authError && <p className="auth-error" role="alert">{authError}</p>}
               <button className="primary-button" type="submit" disabled={authLoading}>{authLoading ? "Logging in..." : "Log In"}</button>
-              <p className="auth-hint">Students: ask your teacher for a username and password.</p>
+              <p className="auth-hint">Students: use the login your teacher gave you. Internet is needed to log in.</p>
             </form>
           )}
 
           {authMode === "signup" && (
             <form className="auth-form" onSubmit={handleTeacherSignup}>
               <label className="field-label">Full name<input type="text" autoComplete="name" value={signupName} onChange={(event) => setSignupName(event.target.value)} required /></label>
-              <label className="field-label">Username<input type="text" autoComplete="username" value={signupUsername} onChange={(event) => setSignupUsername(event.target.value)} required minLength={3} /></label>
-              <label className="field-label">Password<input type="password" autoComplete="new-password" value={signupPassword} onChange={(event) => setSignupPassword(event.target.value)} required minLength={8} /></label>
+              <label className="field-label">Username<input type="text" autoComplete="username" value={signupUsername} onChange={(event) => setSignupUsername(event.target.value)} required minLength={3} aria-describedby="signup-username-hint" /></label>
+              <small className="field-hint" id="signup-username-hint">3–32 characters: letters, numbers, dots, hyphens or underscores.</small>
+              <label className="field-label">Password (at least 8 characters)<input type="password" autoComplete="new-password" value={signupPassword} onChange={(event) => setSignupPassword(event.target.value)} required minLength={8} /></label>
               {authError && <p className="auth-error" role="alert">{authError}</p>}
               <button className="primary-button" type="submit" disabled={authLoading}>{authLoading ? "Creating account..." : "Create Teacher Account"}</button>
               <p className="auth-hint">Teacher accounts can create student logins after signing in.</p>
@@ -947,7 +946,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
               <div>
                 <div className="row-between"><strong>{module.title}</strong><span>{modulePercent}%</span></div>
                 <div className="progress-track"><span style={{ width: `${modulePercent}%` }} /></div>
-                <div className="row-between"><small>Q{module.quarterNumber} · {completed} of {REQUIRED_STAGES.length} stages</small>{grade && <small className={`graded-badge${justGraded.has(module.id) ? " graded-badge-new" : ""}`}>Graded{grade.score != null ? ` · ${grade.score}/100` : ""}</small>}</div>
+                <div className="row-between"><small>Q{module.quarterNumber} · {completed} of {REQUIRED_STAGES.length} steps</small>{grade && <small className={`graded-badge${justGraded.has(module.id) ? " graded-badge-new" : ""}`}>Graded{grade.score != null ? ` · ${grade.score}/100` : ""}</small>}</div>
               </div>
             </button>
           );
@@ -982,7 +981,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
                     <h2>Class Progress</h2>
                     <strong className="overall-percent">{students.length}</strong>
                   </div>
-                  <p>{students.length} student account{students.length === 1 ? "" : "s"} - {classRecords.length} submission{classRecords.length === 1 ? "" : "s"} synced</p>
+                  <p>{students.length} student account{students.length === 1 ? "" : "s"} · {classRecords.length} answer{classRecords.length === 1 ? "" : "s"} received</p>
                   <div className="home-actions">
                     <button className="secondary-button compact-button" onClick={() => goTo("classes")}>Manage Classes</button>
                     <button className="text-button compact-button" onClick={() => goTo("modules")}>Preview Lessons</button>
@@ -997,10 +996,10 @@ function Workspace({ user }: { user: AuthUser | null }) {
                         <div>
                           <div className="row-between"><strong>{student.name}</strong><span>{studentPercent}%</span></div>
                           <div className="progress-track"><span style={{ width: `${studentPercent}%` }} /></div>
-                          <small>{recordCount} submission{recordCount === 1 ? "" : "s"} synced</small>
+                          <small>{recordCount} answer{recordCount === 1 ? "" : "s"} received</small>
                         </div>
                       </div>
-                    )) : <p className="muted">No students yet. Add one from the Classes tab.</p>}
+                    )) : <p className="muted">No students yet. Open Classes to create a section and add students.</p>}
                   </div>
                 </article>
               </>
@@ -1011,7 +1010,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
                   <strong className="overall-percent">{overallPercent}%</strong>
                 </div>
                 <div className="progress-track overall-track"><span style={{ width: `${overallPercent}%` }} /></div>
-                <p>{overallCompleted} of {overallTotal} activity stages completed</p>
+                <p>{overallCompleted} of {overallTotal} activity steps completed</p>
                 <div className="progress-categories">
                   {progressSection("Completed", completedModules, "No experiments completed yet.")}
                   {progressSection("Started", startedModules, "No experiments started yet.")}
@@ -1051,9 +1050,9 @@ function Workspace({ user }: { user: AuthUser | null }) {
               })}
               {selectedQuarter && !selectedGroup && [...new Set(visibleModules.filter(item => item.quarterNumber === selectedQuarter).map(item => item.groupId))].map(group => {
                 const items = visibleModules.filter(item => item.groupId === group);
-                return <button className="module-card" key={group} onClick={() => setSelectedGroup(group)}><ModuleIcon moduleId={group} /><span><strong>{items[0].moduleNumber}. {items[0].moduleTitle}</strong><small>{items.length} POE experiments</small></span><span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span></button>;
+                return <button className="module-card" key={group} onClick={() => setSelectedGroup(group)}><ModuleIcon moduleId={group} /><span><strong>{items[0].moduleNumber}. {items[0].moduleTitle}</strong><small>{items.length} experiment{items.length === 1 ? "" : "s"}</small></span><span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span></button>;
               })}
-              {selectedGroup && visibleModules.filter(item => item.groupId === selectedGroup).map(item => <button className="module-card" key={item.id} onClick={() => { setActiveModule(item); goTo("detail"); }}><ModuleIcon moduleId={item.id} /><span><strong>{item.title}</strong><small>{item.subtitle}</small><small>{stagesFor(records, item.id).size ? `${REQUIRED_STAGES.filter(stage => stagesFor(records, item.id).has(stage)).length}/3 POE stages complete` : "Ready to explore"}</small></span><span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span></button>)}
+              {selectedGroup && visibleModules.filter(item => item.groupId === selectedGroup).map(item => <button className="module-card" key={item.id} onClick={() => { setActiveModule(item); goTo("detail"); }}><ModuleIcon moduleId={item.id} /><span><strong>{item.title}</strong><small>{item.subtitle}</small><small>{stagesFor(records, item.id).size ? `${REQUIRED_STAGES.filter(stage => stagesFor(records, item.id).has(stage)).length}/3 steps complete` : "Ready to explore"}</small></span><span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span></button>)}
               {!visibleModules.some(item => (!selectedQuarter || item.quarterNumber === selectedQuarter) && (!selectedGroup || item.groupId === selectedGroup)) && <p>No matching experiments. Try another search.</p>}
             </div>
           </section>
@@ -1073,8 +1072,8 @@ function Workspace({ user }: { user: AuthUser | null }) {
             {predictLocked ? (
               <>
                 <article className="panel-card locked-notice">
-                  <h2>Prediction Submitted</h2>
-                  <p>You already submitted your prediction for this experiment. Ask your teacher to reset it if you need to try again.</p>
+                  <h2>Prediction Saved</h2>
+                  <p>Your prediction is saved and locked. Review it below or continue to Observe. Ask your teacher to reset this experiment if you need to change it.</p>
                   <textarea className="readonly-field" rows={6} value={predictionReview} readOnly aria-readonly="true" aria-label="Your submitted prediction" />
                   <button className="primary-button" onClick={() => { setTrialPulse(0); goTo("observe"); }}>Continue to Observe</button>
                 </article>
@@ -1088,6 +1087,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
             ) : (
               <article className="panel-card form-panel">
                 <h2>Prediction Questions</h2>
+                {!isTeacherPreview && <p className="muted">Saving locks these answers. Ask your teacher if you need to change them later.</p>}
                 <div className="prediction-questions">
                   {activeModule.predictions.map((prediction, questionIndex) => (
                     <fieldset className="prediction-question" key={prediction.question}>
@@ -1102,7 +1102,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
                 </div>
                 <label className="field-label">Reasoning (optional)<textarea rows={3} placeholder="Why do you think so? (optional)" value={predictionNote} onChange={(event) => setPredictionNote(event.target.value)} /></label>
                 <button className="primary-button" onClick={async () => {
-                  if (activeModule.predictions.some((_, index) => !selectedPredictions[index])) return showToast("Answer all prediction questions.");
+                  if (activeModule.predictions.some((_, index) => !selectedPredictions[index])) return showToast("Choose an answer for each prediction question.");
                   const answers = activeModule.predictions.map((prediction, index) => `${index + 1}. ${prediction.question}\nAnswer: ${selectedPredictions[index]}`).join("\n\n");
                   const text = `${answers}${predictionNote.trim() ? `\n\nReasoning: ${predictionNote.trim()}` : ""}`;
                   if (!isTeacherPreview) {
@@ -1112,7 +1112,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
                   }
                   setTrialPulse(0);
                   goTo("observe");
-                }}>Next</button>
+                }}>{isTeacherPreview ? "Preview Observation" : "Save Prediction"}</button>
               </article>
             )}
           </section>
@@ -1162,7 +1162,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
                   </div>
                 )) : <p className="muted">No trials yet. Change a variable, then run a trial.</p>}
               </div>
-              {observeLocked && <p className="teacher-preview-note">Observation saved. You can continue comparing trials; ask your teacher to reset the submission to replace it.</p>}
+              {!isTeacherPreview && <p className="teacher-preview-note">{observeLocked ? "Your observation is saved. More trials will not replace it. Ask your teacher to reset this experiment if you need to change your saved answer." : "Your first trial saves your observation. You can run more trials to compare results."}</p>}
               <button className="primary-button" disabled={(viewMode === "ar" && (!cameraReady || !markerDetected))} onClick={async () => {
                 if (viewMode === "ar" && (!cameraReady || !markerDetected)) return showToast("Detect the Tuklas marker before saving an AR trial.");
                 setTrialPulse((current) => current + 1);
@@ -1173,7 +1173,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
                   await syncUnsyncedRecords(next);
                 }
               }}>Run Trial</button>
-              <button className="secondary-button" onClick={() => (isTeacherPreview || activeModuleStages.has("Observe")) ? goTo("explain") : showToast("Run at least one AR or 3D trial first.")}>Continue</button>
+              <button className="secondary-button" onClick={() => (isTeacherPreview || activeModuleStages.has("Observe")) ? goTo("explain") : showToast("Run a trial before continuing to Explain.")}>Continue to Explain</button>
             </article>
           </section>
         )}
@@ -1183,8 +1183,8 @@ function Workspace({ user }: { user: AuthUser | null }) {
             {isTeacherPreview && <p className="teacher-preview-note"><Eye size={16} strokeWidth={2.4} aria-hidden="true" /><span>Teacher Preview - your write-up here isn't saved as student work.</span></p>}
             {explainLocked ? (
               <article className="panel-card locked-notice">
-                <h2>Explanation Submitted</h2>
-                <p>You already submitted your explanation for this experiment. Ask your teacher to reset it if you need to try again.</p>
+                <h2>Explanation Saved</h2>
+                <p>Your explanation is saved and locked. Ask your teacher to reset this experiment if you need to change it.</p>
                 <textarea className="readonly-field" rows={6} value={existingExplainText} readOnly aria-readonly="true" aria-label="Your submitted explanation" />
                 <button className="primary-button" onClick={() => goTo("result")}>View Results</button>
               </article>
@@ -1194,6 +1194,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
                 <label className="field-label">My predictions<textarea className="readonly-field" rows={10} value={predictionReview} readOnly aria-readonly="true" /></label>
                 <label className="field-label">Evidence from observation<textarea rows={5} placeholder="What did you observe? Include data or patterns." value={evidence} onChange={(event) => setEvidence(event.target.value)} /></label>
                 <label className="field-label">Scientific explanation<textarea rows={5} placeholder="Explain why this happened using scientific ideas." value={explanation} onChange={(event) => setExplanation(event.target.value)} /></label>
+                {!isTeacherPreview && <p className="muted">Saving locks your explanation. Ask your teacher if you need to change it.</p>}
                 <button className="primary-button" onClick={async () => {
                   if (!evidence.trim() || !explanation.trim()) return showToast("Add evidence and a scientific explanation.");
                   if (!isTeacherPreview) {
@@ -1202,7 +1203,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
                     await syncUnsyncedRecords(next);
                   }
                   goTo("result");
-                }}>Submit</button>
+                }}>{isTeacherPreview ? "Preview Results" : "Save Explanation"}</button>
               </article>
             )}
           </section>
@@ -1251,7 +1252,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
               <article className="panel-card"><p>Tuklas is installed on this device.</p></article>
             )}
             <button className="settings-row" onClick={prepareOffline}><span><strong>Prepare for Offline Use</strong><small>{offlineStatus}</small></span><span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span></button>
-            <button className="settings-row" onClick={handleSync}><span><strong>Sync Saved Work</strong><small>{records.filter((record) => !record.syncedAt).length} records waiting to sync.</small></span><span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span></button>
+            <button className="settings-row" onClick={handleSync}><span><strong>Send Saved Work</strong><small>{records.filter((record) => !record.syncedAt).length} saved answer{records.filter((record) => !record.syncedAt).length === 1 ? "" : "s"} waiting to send.</small></span><span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span></button>
             <button className="settings-row" onClick={checkDevice}><span><strong>Device Check</strong><small>{deviceStatus}</small></span><span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span></button>
             <details className="panel-card secondary-details offline-checklist"><summary className="row-between"><h2>Offline Setup</h2><span className="disclosure-chevron" aria-hidden="true"><ChevronRight size={18} strokeWidth={2.4} /></span></summary><ol><li>Open this HTTPS app while connected.</li><li>Tap Prepare for Offline Use.</li><li>Add the app to the home screen.</li><li>Reopen in airplane mode and run one trial.</li></ol></details>
             <AppInfo />
@@ -1261,13 +1262,13 @@ function Workspace({ user }: { user: AuthUser | null }) {
                   if (!user) return;
                   const unsyncedCount = records.filter((record) => !record.syncedAt).length;
                   const message = unsyncedCount
-                    ? `This permanently deletes ${unsyncedCount} unsynced record${unsyncedCount === 1 ? "" : "s"} that never reached the server - that work cannot be recovered. Already-submitted (synced) work will simply reappear next sync, since only a teacher's Reset Progress can actually undo it. Continue?`
-                    : "This clears this device's local cache. Already-submitted (synced) work will reappear on next sync - only a teacher's Reset Progress can actually undo it. Continue?";
+                    ? `Delete saved copies from this device? ${unsyncedCount} answer${unsyncedCount === 1 ? " has" : "s have"} not been sent to your teacher and will be permanently lost. Answers already sent remain in your account and will download again when connected. Clear saved copies?`
+                    : "Delete saved copies from this device? Answers already sent remain in your account and will download again when connected. This does not reset your progress. Clear saved copies?";
                   if (!window.confirm(message)) return;
                   await recordSession.current?.clear();
-                  showToast("Local cache cleared.");
-                }}>Clear Cache</button></div>
-                <p className="muted">Clears this device's cache only. Already-submitted work stays locked until your teacher resets it.</p>
+                  showToast("Saved copies cleared from this device.");
+                }}>Clear Saved Copies</button></div>
+                <p className="muted">Only this device is cleared. Sent answers stay in your account; unsent answers will be lost.</p>
                 {records.length ? (() => {
                   // One collapsed one-line row per module (curriculum order), all inside a single
                   // collapsed summary, so a student with every module done still sees one line.
@@ -1278,7 +1279,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
                   return (
                   <details className="saved-all">
                     <summary className="row-between">
-                      <span><strong>{moduleIds.length} module{moduleIds.length === 1 ? "" : "s"}</strong> · {completedCount} completed{unsyncedTotal ? ` · ${unsyncedTotal} not synced` : ""}</span>
+                      <span><strong>{moduleIds.length} experiment{moduleIds.length === 1 ? "" : "s"}</strong> · {completedCount} completed{unsyncedTotal ? ` · ${unsyncedTotal} waiting to send` : ""}</span>
                       <span className="disclosure-chevron" aria-hidden="true"><ChevronRight size={18} strokeWidth={2.4} /></span>
                     </summary>
                     <div className="records-list">
@@ -1291,12 +1292,12 @@ function Workspace({ user }: { user: AuthUser | null }) {
                         <details className="record-card saved-module" key={moduleId}>
                           <summary className="row-between">
                             <span className="saved-title">{modules.find((module) => module.id === moduleId)?.title ?? moduleRecords[0].module}</span>
-                            <span className={`saved-status ${done === REQUIRED_STAGES.length ? "saved-complete" : ""}`}>{done === REQUIRED_STAGES.length ? "Completed" : `${done}/${REQUIRED_STAGES.length}`}{unsynced ? " · not synced" : ""}</span>
+                            <span className={`saved-status ${done === REQUIRED_STAGES.length ? "saved-complete" : ""}`}>{done === REQUIRED_STAGES.length ? "Completed" : `${done}/${REQUIRED_STAGES.length} steps`}{unsynced ? " · not sent" : ""}</span>
                             <span className="disclosure-chevron" aria-hidden="true"><ChevronRight size={16} strokeWidth={2.4} /></span>
                           </summary>
                           {moduleRecords.map((record) => (
                             <div className="saved-entry" key={record.id}>
-                              <small>{record.stage} / {new Date(record.createdAt).toLocaleString()} / {record.syncedAt ? "synced" : "offline"}</small>
+                              <small>{record.stage} / {new Date(record.createdAt).toLocaleString()} / {record.syncedAt ? "Sent" : "Not sent"}</small>
                               <p>{record.text}</p>
                             </div>
                           ))}
@@ -1306,7 +1307,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
                     </div>
                   </details>
                   );
-                })() : <p className="muted">No saved progress on this device yet.</p>}
+                })() : <p className="muted">No saved answers on this device yet.</p>}
                 <button className="secondary-button" onClick={() => {
                   const blob = new Blob([JSON.stringify(records, null, 2)], { type: "application/json" });
                   const url = URL.createObjectURL(blob);
@@ -1315,7 +1316,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
                   link.download = "tuklas-saved-progress.json";
                   link.click();
                   URL.revokeObjectURL(url);
-                }}>Export JSON</button>
+                }}>Download Saved Work (JSON)</button>
               </article>
             )}
           </section>
@@ -1357,8 +1358,9 @@ function Workspace({ user }: { user: AuthUser | null }) {
               {showAddStudent && (
                 <form className="auth-form compact-form" onSubmit={handleCreateSectionStudent}>
                   <label className="field-label">Full name<input type="text" value={studentName} onChange={(event) => setStudentName(event.target.value)} required /></label>
-                  <label className="field-label">Username<input type="text" value={studentUsername} onChange={(event) => setStudentUsername(event.target.value)} required minLength={3} /></label>
-                  <label className="field-label">Password<input type="password" value={studentPassword} onChange={(event) => setStudentPassword(event.target.value)} required minLength={8} /></label>
+                  <label className="field-label">Username<input type="text" value={studentUsername} onChange={(event) => setStudentUsername(event.target.value)} required minLength={3} aria-describedby="student-username-hint" /></label>
+                  <small className="field-hint" id="student-username-hint">3–32 characters: letters, numbers, dots, hyphens or underscores.</small>
+                  <label className="field-label">Password (at least 8 characters)<input type="password" value={studentPassword} onChange={(event) => setStudentPassword(event.target.value)} required minLength={8} /></label>
                   {studentFormError && <p className="auth-error" role="alert">{studentFormError}</p>}
                   <button className="secondary-button" type="submit">Add Student</button>
                 </form>
@@ -1384,7 +1386,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
               <article className="panel-card">
                 <p className="eyebrow">Login Slips</p>
                 <h2>{slips.length} login{slips.length === 1 ? "" : "s"} ready to print</h2>
-                <p>Print and cut these now, or send each one from your own phone by SMS or email (the app does not store any number or address). Passwords are not saved and cannot be shown again; if a slip gets lost, use New Password on that student.</p>
+                <p>Print these slips or share them by SMS or email from your own phone. These passwords disappear when you refresh or log out. To reprint later, use Print Slip and enter the password you know. If it is forgotten, use New Password.</p>
                 <div className="records-list">
                   {slips.map((slip) => {
                     const message = encodeURIComponent(`Tuklas AR login for ${slip.name}: username ${slip.username}, password ${slip.password}. Open ${window.location.host} to log in. Keep this private.`);
@@ -1402,7 +1404,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
                 </div>
                 <div className="row-between">
                   <button type="button" className="primary-button" onClick={printSlips}><Printer size={18} />Print Slips</button>
-                  <button type="button" className="text-button" onClick={() => { if (window.confirm("Clear the slips? Unprinted passwords will be lost.")) setSlips([]); }}>Clear</button>
+                  <button type="button" className="text-button" onClick={() => { if (window.confirm("Clear these login slips? Any passwords you have not printed or shared will no longer be shown. This does not delete student accounts or change their passwords.")) setSlips([]); }}>Clear Slips</button>
                 </div>
               </article>
             )}
@@ -1436,10 +1438,10 @@ function Workspace({ user }: { user: AuthUser | null }) {
                               <div className="row-between student-module-row" key={module.id}>
                                 {done > 0 ? (
                                   <button type="button" className="text-button module-grade-link" onClick={() => openGrading(student, module.id)}>
-                                    {module.title} - {done}/{REQUIRED_STAGES.length} stages{grade ? ` - Graded${grade.score != null ? ` (${grade.score})` : ""}` : ""}
+                                    {module.title} - {done}/{REQUIRED_STAGES.length} steps{grade ? ` - Graded${grade.score != null ? ` (${grade.score})` : ""}` : ""}
                                   </button>
                                 ) : (
-                                  <small>{module.title} - {done}/{REQUIRED_STAGES.length} stages</small>
+                                  <small>{module.title} - {done}/{REQUIRED_STAGES.length} steps</small>
                                 )}
                                 {done > 0 && <button type="button" className="text-button compact-button" onClick={() => handleResetProgress(student.id, module.id)}>Reset</button>}
                               </div>
@@ -1453,7 +1455,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
                       )}
                     </article>
                   );
-                }) : <p className="muted">No students enrolled yet.</p>}
+                }) : <p className="muted">No students enrolled yet. Use Add Student or Add Whole Class above.</p>}
               </div>
             </article>
           </section>
@@ -1514,7 +1516,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
         <form className="auth-form student-slip-form" onSubmit={printStudentSlip}>
           <h2 id="student-slip-title">Print Student Slip</h2>
           <p className="slip-student"><strong>{slipStudent?.name}</strong><small>@{slipStudent?.username}</small></p>
-          <p id="student-slip-hint">Enter the student's current password. It will be printed as typed; the app cannot check it here.</p>
+          <p id="student-slip-hint">Enter the student's current password. It is required for printing, but the app cannot verify it. Printing does not change the password.</p>
           <label className="field-label">Student password<input name="password" type="password" autoComplete="off" required aria-describedby="student-slip-hint" /></label>
           <div className="row-between">
             <button type="button" className="secondary-button" onClick={() => slipDialog.current?.close()}>Cancel</button>
