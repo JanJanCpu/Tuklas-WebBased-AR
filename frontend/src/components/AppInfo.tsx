@@ -2,7 +2,7 @@ import { ChevronRight } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 // Shown in Settings and in the fps HUD; bump on every build you want to confirm on a phone.
-export const BUILD = "b55";
+export const BUILD = "b56";
 const UPDATED = "October 13, 2026";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -88,7 +88,7 @@ export function GettingStarted({ userId, role }: { userId: string; role: "studen
   if (done) return null;
   return (
     <article className="panel-card getting-started">
-      <p className="eyebrow">Getting Started</p>
+      <h2>Getting Started</h2>
       <ol>
         {tips[role].map(([title, text]) => <li key={title}><strong>{title}</strong><p>{text}</p></li>)}
       </ol>

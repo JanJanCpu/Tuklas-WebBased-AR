@@ -23,12 +23,7 @@
   --line: #ccd8ea;
   --surface: #f5f8fd;
   --panel: #ffffff;
-  /* A quieter resting shadow so the one elevated "hero" surface per screen (see .overall-progress)
-     actually reads as heavier than everything around it, instead of every card shouting equally.
-     Strong enough on its own to read as an edge against --surface without a visible border line -
-     on a washed-out budget-phone screen in daylight, a shadow this faint plus zero border would
-     make cards disappear, so this is deliberately not as faint as a desktop-only app could get
-     away with. */
+  /* Reserved for dialogs and the live experiment viewport. */
   --shadow: 0 8px 20px rgba(15, 76, 154, 0.1);
   --camera: #27344d;
   /* A softer, friendlier corner radius for cards, buttons and other main surfaces.
@@ -343,35 +338,13 @@ small {
   border-radius: var(--radius);
   cursor: pointer;
   font-weight: 800;
-  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+  transition: transform 120ms ease, background 120ms ease;
 }
 
 .primary-button {
-  position: relative;
-  overflow: hidden;
   border: 0;
   color: #fff;
-  background: linear-gradient(135deg, var(--blue) 0%, var(--blue-dark) 100%);
-  box-shadow: 0 10px 22px rgba(15, 76, 154, 0.32);
-}
-
-/* A camera-shutter flash on press instead of a generic bounce - every primary action in
-   Tuklas reads as "capturing" something, consistent with the AR/viewfinder identity rather
-   than a borrowed game-reward feel. Pure CSS: flashes instantly on press, fades on release,
-   so even a quick tap still shows it. */
-.primary-button::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: rgba(255, 255, 255, 0.55);
-  opacity: 0;
-  transition: opacity 450ms ease;
-  pointer-events: none;
-}
-
-.primary-button:active::after {
-  opacity: 1;
-  transition: opacity 0ms;
+  background: var(--blue);
 }
 
 /* Icon + label buttons (Download, Print Slips): space the icon from the text. */
@@ -390,19 +363,15 @@ small {
   background: #fff;
 }
 
-/* A light press-down on every clickable surface, skipped for touch-only devices
-   since a lingering :active state on tap feels sticky rather than tactile there. */
 @media (hover: hover) and (pointer: fine) {
   .primary-button:not(:disabled):hover {
-    box-shadow: 0 12px 26px rgba(15, 76, 154, 0.4);
+    background: var(--blue-dark);
   }
 
   .module-card:hover,
   .settings-row:hover,
-  .task-card:hover,
-  .account-indicator:hover {
-    box-shadow: 0 14px 30px rgba(15, 76, 154, 0.16);
-    transform: translateY(-1px);
+  .task-card:hover {
+    border-color: var(--blue);
   }
 }
 
@@ -436,6 +405,14 @@ small {
   border-bottom: 4px solid var(--gold);
   color: #fff;
   background: linear-gradient(100deg, var(--blue-dark), var(--blue));
+}
+
+.app-header:has(.back-button:not(.visible)) {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.app-header .back-button:not(.visible) {
+  display: none;
 }
 
 .header-actions {
@@ -623,25 +600,11 @@ small {
   gap: 16px;
 }
 
-/* Screens are mounted one at a time (see App.tsx), so this plays on every navigation:
-   a short fade/rise-in makes switching screens feel considered instead of an instant swap. */
 .screen.active {
   display: grid;
-  animation: screen-enter 220ms ease both;
-}
-
-@keyframes screen-enter {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .screen.active {
-    animation: none;
-  }
-
   .row-capture-lock {
     animation: none;
   }
@@ -656,9 +619,6 @@ small {
   }
 }
 
-/* Edges are drawn with shadow alone, not a visible 1px border - a bordered card reads as an
-   older "boxed form" style; letting the shadow do the edge work is the more current look
-   (Linear/Notion/Stripe-era cards) and it's one fewer hard line fighting the soft shadow. */
 .panel-card,
 .hero-card,
 .task-card,
@@ -667,11 +627,10 @@ small {
 .ar-panel,
 .result-card,
 .record-card {
-  border: 1px solid rgba(15, 76, 154, 0.05);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
-  box-shadow: var(--shadow);
-  transition: transform 120ms ease, box-shadow 120ms ease;
+  transition: transform 120ms ease, border-color 120ms ease;
 }
 
 .hero-card,
@@ -690,6 +649,15 @@ small {
   grid-template-columns: 48px minmax(0, 1fr);
   gap: 12px;
   align-items: center;
+}
+
+.lesson-intro {
+  display: grid;
+  gap: 12px;
+}
+
+.lesson-intro p {
+  margin: 0;
 }
 
 .module-icon {
@@ -756,18 +724,14 @@ small {
   width: 0%;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--blue) 0%, #2f7fd8 100%);
+  background: var(--blue);
   transition: width 180ms ease;
 }
 
-/* The one card on Home that gets more visual weight than everything around it -
-   a heavier shadow and a gold top edge, the same treatment every other card deliberately
-   does not get, so the eye lands here first instead of every surface competing equally. */
 .overall-progress {
   display: grid;
   gap: 10px;
   border-top: 5px solid var(--gold);
-  box-shadow: 0 18px 40px rgba(15, 76, 154, 0.22);
 }
 
 .overall-progress > p,
@@ -849,13 +813,13 @@ button.module-progress-row {
   cursor: pointer;
 }
 
-.marker-access,
 .marker-access-copy {
   display: grid;
   gap: 14px;
 }
 
 .marker-access-copy {
+  margin-top: 14px;
   grid-template-columns: minmax(0, 1fr) 120px;
   align-items: center;
 }
@@ -864,6 +828,36 @@ button.module-progress-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+  margin-top: 14px;
+}
+
+.marker-access > summary,
+.secondary-details > summary {
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.marker-access > summary::-webkit-details-marker,
+.secondary-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.marker-access > summary h2,
+.secondary-details > summary h2,
+.ar-panel h2,
+.form-panel > h2,
+.feedback-card h2 {
+  margin: 0;
+}
+
+.secondary-details[open] > :not(summary) {
+  margin-top: 12px;
+}
+
+.marker-access[open] > summary .disclosure-chevron,
+.secondary-details[open] > summary .disclosure-chevron {
+  transform: rotate(90deg);
 }
 
 .marker-actions a {
@@ -888,7 +882,7 @@ button.module-progress-row {
   color: inherit;
   text-align: left;
   cursor: pointer;
-  transition: transform 120ms ease, box-shadow 120ms ease;
+  transition: transform 120ms ease, border-color 120ms ease;
 }
 
 .task-card,
@@ -994,17 +988,15 @@ textarea:focus {
 .poe-steps span {
   display: grid;
   place-items: center;
-  min-height: 52px;
-  border: 1px dashed var(--line);
-  border-radius: var(--radius);
+  min-height: 44px;
+  border-bottom: 2px solid var(--line);
   color: var(--muted);
   font-weight: 900;
 }
 
 .poe-steps span.active {
-  color: #fff;
+  color: var(--blue);
   border-color: var(--blue);
-  background: var(--blue);
 }
 
 .poe-steps small {
@@ -1616,36 +1608,17 @@ input[type="range"] {
 
 .result-card {
   display: grid;
-  justify-items: center;
-  text-align: center;
+  gap: 8px;
 }
 
-.score-ring {
-  display: grid;
-  place-items: center;
-  width: 132px;
-  height: 132px;
-  margin: 8px 0 12px;
-  border: 12px solid var(--blue);
-  border-right-color: #d9e3f1;
-  border-radius: 50%;
+.result-card h2,
+.result-card p {
+  margin: 0;
 }
 
-.score-ring strong,
-.score-ring span {
-  grid-area: 1 / 1;
-}
-
-.score-ring strong {
-  transform: translateY(-8px);
-  font-size: 1.65rem;
-}
-
-.score-ring span {
-  transform: translateY(18px);
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 800;
+.completion-summary strong {
+  color: var(--blue);
+  font-variant-numeric: tabular-nums;
 }
 
 .teacher-tools {
@@ -1656,6 +1629,17 @@ input[type="range"] {
 .records-list {
   display: grid;
   gap: 8px;
+}
+
+.records-list > .record-card {
+  border: 0;
+  border-radius: 0;
+  padding: 12px 0;
+  background: transparent;
+}
+
+.records-list > .record-card + .record-card {
+  border-top: 1px solid var(--line);
 }
 
 .record-card {
@@ -2019,8 +2003,7 @@ input[type="range"] {
 .auth-tabs button.active {
   color: #fff;
   border-color: var(--blue);
-  background: linear-gradient(135deg, var(--blue) 0%, var(--blue-dark) 100%);
-  box-shadow: 0 8px 18px rgba(15, 76, 154, 0.28);
+  background: var(--blue);
 }
 
 .auth-form {

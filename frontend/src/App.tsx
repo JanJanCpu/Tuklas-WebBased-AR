@@ -919,7 +919,6 @@ function Workspace({ user }: { user: AuthUser | null }) {
         </section>
         <section className="landing-marker">
           <div>
-            <p className="eyebrow">Reusable Group Marker</p>
             <h2>One printed marker per group</h2>
             <p>Students use the same marker across lessons during camera observation.</p>
           </div>
@@ -946,9 +945,9 @@ function Workspace({ user }: { user: AuthUser | null }) {
               </>}
               <ModuleIcon moduleId={module.id} />
               <div>
-                <div className="row-between"><strong>{module.quarter}: {module.title}</strong><span>{modulePercent}%</span></div>
+                <div className="row-between"><strong>{module.title}</strong><span>{modulePercent}%</span></div>
                 <div className="progress-track"><span style={{ width: `${modulePercent}%` }} /></div>
-                <div className="row-between"><small>{completed} of {REQUIRED_STAGES.length} stages</small>{grade && <small className={`graded-badge${justGraded.has(module.id) ? " graded-badge-new" : ""}`}>Graded{grade.score != null ? ` · ${grade.score}/100` : ""}</small>}</div>
+                <div className="row-between"><small>Q{module.quarterNumber} · {completed} of {REQUIRED_STAGES.length} stages</small>{grade && <small className={`graded-badge${justGraded.has(module.id) ? " graded-badge-new" : ""}`}>Graded{grade.score != null ? ` · ${grade.score}/100` : ""}</small>}</div>
               </div>
             </button>
           );
@@ -962,7 +961,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
       <header className="app-header" ref={headerRef}>
         <button className={`back-button ${(history.length > 0 || selectedQuarter !== null) && screen !== "home" ? "visible" : ""}`} onClick={goBack} aria-label="Go back"><ChevronLeft size={20} strokeWidth={2.6} /></button>
         <div>
-          <p className="eyebrow">{titles[screen][0]}</p>
+          {screen !== "home" && <p className="eyebrow">{titles[screen][0]}</p>}
           <h1>{titles[screen][1]}</h1>
         </div>
         <div className="header-actions">
@@ -990,7 +989,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
                   </div>
                 </article>
                 <article className="panel-card class-roster">
-                  <p className="eyebrow">Student Progress</p>
+                  <h2>Student Progress</h2>
                   <div className="module-progress-list">
                     {classSummary.length ? classSummary.map(({ student, recordCount, percent: studentPercent }) => (
                       <div className="module-progress-row" key={student.id}>
@@ -1008,7 +1007,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
             ) : (
               <article className="panel-card overall-progress">
                 <div className="row-between">
-                  <div><p className="eyebrow">All Experiments</p><h2>Progress Summary</h2></div>
+                  <h2>Progress Summary</h2>
                   <strong className="overall-percent">{overallPercent}%</strong>
                 </div>
                 <div className="progress-track overall-track"><span style={{ width: `${overallPercent}%` }} /></div>
@@ -1018,34 +1017,19 @@ function Workspace({ user }: { user: AuthUser | null }) {
                   {progressSection("Started", startedModules, "No experiments started yet.")}
                   {progressSection("Not Started", notStartedModules, "All experiments have been started.")}
                 </div>
-                {/* old progress list removed */}
-                {false && <div>
-                  {moduleProgress.map(({ module, completed, percent: modulePercent, stages, grade }) => (
-                    <button type="button" className="module-progress-row" key={module.id} onClick={() => openModuleProgress(module, stages)}>
-                      <ModuleIcon moduleId={module.id} />
-                      <div>
-                        <div className="row-between"><strong>{module.quarter}: {module.title}</strong><span>{modulePercent}%</span></div>
-                        <div className="progress-track"><span style={{ width: `${modulePercent}%` }} /></div>
-                        <div className="row-between">
-                          <small>{completed} of {REQUIRED_STAGES.length} stages</small>
-                          {grade && <small className="graded-badge">Graded{grade.score != null ? ` · ${grade.score}/100` : ""}</small>}
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>}
               </article>
             )}
-            <article className="panel-card marker-access">
+            <details className="panel-card marker-access">
+              <summary className="row-between"><h2>Printable and downloadable marker</h2><span className="disclosure-chevron" aria-hidden="true"><ChevronRight size={18} strokeWidth={2.4} /></span></summary>
               <div className="marker-access-copy">
-                <div><h2>Printable and downloadable marker</h2><p>Open the marker for printing or download a copy for offline classroom use.</p></div>
+                <p>Open the marker for printing or download a copy for offline classroom use.</p>
                 <a className="marker-preview" href="/assets/tuklas-flask.png" target="_blank" rel="noreferrer" aria-label="Open printable Tuklas AR marker"><img src="/assets/tuklas-flask.png" alt="" /></a>
               </div>
               <div className="marker-actions">
                 <a className="primary-button" href="/assets/tuklas-flask.png" target="_blank" rel="noreferrer"><Printer size={18} />Open to Print</a>
                 <a className="secondary-button" href="/assets/tuklas-flask.png" download="tuklas-ar-marker.png"><Download size={18} />Download Marker</a>
               </div>
-            </article>
+            </details>
           </section>
         )}
 
@@ -1078,35 +1062,32 @@ function Workspace({ user }: { user: AuthUser | null }) {
         {screen === "detail" && (
           <section className="screen active">
             {isTeacherPreview && <p className="teacher-preview-note"><Eye size={16} strokeWidth={2.4} aria-hidden="true" /><span>Teacher Preview - explore this lesson before assigning it. Nothing here is saved as student work.</span></p>}
-            <article className="panel-card">
+            <article className="panel-card lesson-intro">
               <div className="module-summary">
                 <ModuleIcon moduleId={activeModule.id} />
-                <div><h2>{activeModule.title}</h2><p>{activeModule.quarter} / {activeModule.moduleTitle}</p><small>Estimated time: {activeModule.time}</small></div>
+                <div><p>{activeModule.quarter} / {activeModule.moduleTitle}</p><small>Estimated time: {activeModule.time}</small></div>
               </div>
-            </article>
-            <article className="panel-card"><p className="eyebrow">Learning Task</p><p>{activeModule.task}</p></article>
-            <article className="panel-card">
-              <p className="eyebrow">POE Steps</p>
-              <div className="poe-steps">{["Predict", "Observe", "Explain"].map((label, index) => <span className={index === 0 ? "active" : ""} key={label}>{index + 1}<small>{label}</small></span>)}</div>
+              <p>{activeModule.task}</p>
+              <div className="poe-steps" role="group" aria-label="Activity steps">{["Predict", "Observe", "Explain"].map((label, index) => <span className={index === 0 ? "active" : ""} aria-current={index === 0 ? "step" : undefined} key={label}>{index + 1}<small>{label}</small></span>)}</div>
             </article>
             {predictLocked ? (
               <>
                 <article className="panel-card locked-notice">
-                  <p className="eyebrow">Prediction Submitted</p>
+                  <h2>Prediction Submitted</h2>
                   <p>You already submitted your prediction for this experiment. Ask your teacher to reset it if you need to try again.</p>
                   <textarea className="readonly-field" rows={6} value={predictionReview} readOnly aria-readonly="true" aria-label="Your submitted prediction" />
                   <button className="primary-button" onClick={() => { setTrialPulse(0); goTo("observe"); }}>Continue to Observe</button>
                 </article>
                 {activeModuleFeedback && (
                   <article className="panel-card feedback-card">
-                    <div className="row-between"><p className="eyebrow">Teacher Feedback</p>{activeModuleFeedback.score != null && <strong className="overall-percent">{activeModuleFeedback.score}/100</strong>}</div>
+                    <div className="row-between"><h2>Teacher Feedback</h2>{activeModuleFeedback.score != null && <strong className="overall-percent">{activeModuleFeedback.score}/100</strong>}</div>
                     <p>{activeModuleFeedback.comment}</p>
                   </article>
                 )}
               </>
             ) : (
               <article className="panel-card form-panel">
-                <p className="eyebrow">Prediction Questions</p>
+                <h2>Prediction Questions</h2>
                 <div className="prediction-questions">
                   {activeModule.predictions.map((prediction, questionIndex) => (
                     <fieldset className="prediction-question" key={prediction.question}>
@@ -1142,7 +1123,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
             {isTeacherPreview && <p className="teacher-preview-note"><Eye size={16} strokeWidth={2.4} aria-hidden="true" /><span>Teacher Preview - trials run normally but aren't saved as student work.</span></p>}
             <article className="ar-panel">
               <div className="row-between">
-                <div><p className="eyebrow">{viewMode === "ar" ? "Camera Mode" : "3D Model Mode"}</p><h2>{viewMode === "ar" ? "Start the camera and observe the trial" : "Explore the model - no camera or marker needed"}</h2></div>
+                <h2>{viewMode === "ar" ? "Camera observation" : "3D observation"}</h2>
                 <button className="text-button compact-button" onClick={() => setViewMode(viewMode === "ar" ? "fallback" : "ar")}>{viewMode === "ar" ? "Use 3D Model" : "Use Camera"}</button>
               </div>
             </article>
@@ -1160,7 +1141,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
               {viewMode === "ar" && <p className="camera-status">{cameraStatus}</p>}
             </div>
             <article className="panel-card form-panel">
-              <p className="eyebrow">Observation Prompt</p>
+              <h2>Observation Prompt</h2>
               <p>{activeModule.observe}</p>
               <div className="control-grid">
                 <label><span>{observationModel.controlA.label} <strong>{formatControlValue(activeModule.id, "a", controlA, observationModel.controlA.unit)}</strong></span><input type="range" min={observationModel.controlA.min} max={observationModel.controlA.max} step={observationModel.controlA.step} value={controlA} onChange={(event) => { setControlA(Number(event.target.value)); if (activeModule.id === "bonding") setLab(current => ({ ...current, electrons: 0 })); }} /></label>
@@ -1202,7 +1183,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
             {isTeacherPreview && <p className="teacher-preview-note"><Eye size={16} strokeWidth={2.4} aria-hidden="true" /><span>Teacher Preview - your write-up here isn't saved as student work.</span></p>}
             {explainLocked ? (
               <article className="panel-card locked-notice">
-                <p className="eyebrow">Explanation Submitted</p>
+                <h2>Explanation Submitted</h2>
                 <p>You already submitted your explanation for this experiment. Ask your teacher to reset it if you need to try again.</p>
                 <textarea className="readonly-field" rows={6} value={existingExplainText} readOnly aria-readonly="true" aria-label="Your submitted explanation" />
                 <button className="primary-button" onClick={() => goTo("result")}>View Results</button>
@@ -1230,32 +1211,34 @@ function Workspace({ user }: { user: AuthUser | null }) {
         {screen === "result" && (
           <section className="screen active">
             {isTeacherPreview ? (
-              <article className="result-card"><div className="score-ring"><strong>OK</strong><span>Preview</span></div><h2>Preview complete</h2><p>Prediction, Observation, and Explanation steps previewed.</p></article>
+              <article className="result-card"><h2>Preview complete</h2><p>Prediction, Observation, and Explanation steps previewed.</p></article>
             ) : (
-              <article className="result-card"><div className="score-ring"><strong>{Math.max(25, percent)}%</strong><span>Complete</span></div><h2>Great work!</h2><p>Prediction, Observation, and Explanation completed.</p></article>
+              <article className="result-card"><h2>Great work!</h2><p className="completion-summary"><strong>{Math.max(25, percent)}%</strong> Complete</p><p>Prediction, Observation, and Explanation completed.</p></article>
             )}
             <LessonCard module={activeModule} />
             {activeModuleFeedback && (
               <article className="panel-card feedback-card">
-                <div className="row-between"><p className="eyebrow">Teacher Feedback</p>{activeModuleFeedback.score != null && <strong className="overall-percent">{activeModuleFeedback.score}/100</strong>}</div>
+                <div className="row-between"><h2>Teacher Feedback</h2>{activeModuleFeedback.score != null && <strong className="overall-percent">{activeModuleFeedback.score}/100</strong>}</div>
                 <p>{activeModuleFeedback.comment}</p>
               </article>
             )}
-            <article className="panel-card form-panel">
-              <p className="eyebrow">Reflection Prompt</p>
-              <p>What did you learn from this activity? How can this be applied in real life?</p>
-              <label className="field-label">My reflection<textarea rows={4} placeholder="Write your reflection..." value={reflection} onChange={(event) => setReflection(event.target.value)} /></label>
-              <button className="secondary-button" onClick={async () => {
-                if (!reflection.trim()) return showToast("Write a reflection before saving.");
-                if (!isTeacherPreview) {
-                  const next = await addRecord("Reflection", reflection.trim());
-                  if (!next) return;
-                  await syncUnsyncedRecords(next);
-                }
-                setReflection("");
-                showToast(isTeacherPreview ? "Reflection previewed (not saved)." : "Reflection saved.");
-              }}>Save Reflection</button>
-            </article>
+            <details className="panel-card secondary-details reflection-panel">
+              <summary className="row-between"><h2>Reflection (optional)</h2><span className="disclosure-chevron" aria-hidden="true"><ChevronRight size={18} strokeWidth={2.4} /></span></summary>
+              <div className="form-panel">
+                <p>What did you learn from this activity? How can this be applied in real life?</p>
+                <label className="field-label">My reflection<textarea rows={4} placeholder="Write your reflection..." value={reflection} onChange={(event) => setReflection(event.target.value)} /></label>
+                <button className="secondary-button" onClick={async () => {
+                  if (!reflection.trim()) return showToast("Write a reflection before saving.");
+                  if (!isTeacherPreview) {
+                    const next = await addRecord("Reflection", reflection.trim());
+                    if (!next) return;
+                    await syncUnsyncedRecords(next);
+                  }
+                  setReflection("");
+                  showToast(isTeacherPreview ? "Reflection previewed (not saved)." : "Reflection saved.");
+                }}>Save Reflection</button>
+              </div>
+            </details>
           </section>
         )}
 
@@ -1265,12 +1248,12 @@ function Workspace({ user }: { user: AuthUser | null }) {
               <button className="settings-row" onClick={installApp}><span><strong>Install App</strong><small>Add Tuklas to your home screen, like a regular app.</small></span><span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span></button>
             )}
             {installed && (
-              <article className="panel-card"><p className="eyebrow">Installed</p><p>Tuklas is installed on this device.</p></article>
+              <article className="panel-card"><p>Tuklas is installed on this device.</p></article>
             )}
             <button className="settings-row" onClick={prepareOffline}><span><strong>Prepare for Offline Use</strong><small>{offlineStatus}</small></span><span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span></button>
             <button className="settings-row" onClick={handleSync}><span><strong>Sync Saved Work</strong><small>{records.filter((record) => !record.syncedAt).length} records waiting to sync.</small></span><span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span></button>
             <button className="settings-row" onClick={checkDevice}><span><strong>Device Check</strong><small>{deviceStatus}</small></span><span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span></button>
-            <article className="panel-card offline-checklist"><p className="eyebrow">Offline Setup</p><ol><li>Open this HTTPS app while connected.</li><li>Tap Prepare for Offline Use.</li><li>Add the app to the home screen.</li><li>Reopen in airplane mode and run one trial.</li></ol></article>
+            <details className="panel-card secondary-details offline-checklist"><summary className="row-between"><h2>Offline Setup</h2><span className="disclosure-chevron" aria-hidden="true"><ChevronRight size={18} strokeWidth={2.4} /></span></summary><ol><li>Open this HTTPS app while connected.</li><li>Tap Prepare for Offline Use.</li><li>Add the app to the home screen.</li><li>Reopen in airplane mode and run one trial.</li></ol></details>
             <AppInfo />
             {!isTeacherPreview && (
               <article className="panel-card teacher-tools">
@@ -1341,7 +1324,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
         {screen === "classes" && (
           <section className="screen active">
             <article className="panel-card">
-              <p className="eyebrow">New Section</p>
+              <h2>New Section</h2>
               <form className="auth-form compact-form" onSubmit={handleCreateSection}>
                 <label className="field-label">Section name<input type="text" placeholder="e.g. Grade 9 - Rizal" value={newSectionName} onChange={(event) => setNewSectionName(event.target.value)} required /></label>
                 {sectionFormError && <p className="auth-error" role="alert">{sectionFormError}</p>}
@@ -1363,8 +1346,6 @@ function Workspace({ user }: { user: AuthUser | null }) {
         {screen === "section" && (
           <section className="screen active">
             <article className="panel-card">
-              <p className="eyebrow">Section</p>
-              <h2>{activeSection?.name || "Loading..."}</h2>
               <p>{sectionStudents.length} student{sectionStudents.length === 1 ? "" : "s"} enrolled</p>
               {sectionRecords.length > 0 && <button type="button" className="secondary-button" onClick={downloadSectionCsv}><Download size={18} />Download Results (CSV)</button>}
             </article>
@@ -1426,7 +1407,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
               </article>
             )}
             <article className="panel-card">
-              <p className="eyebrow">Enrolled Students</p>
+              <h2>Enrolled Students</h2>
               <div className="records-list">
                 {sectionStudents.length ? sectionStudents.map((student) => {
                   const studentRecords = sectionRecords.filter((record) => record.userId === student.id);
@@ -1484,12 +1465,10 @@ function Workspace({ user }: { user: AuthUser | null }) {
           return (
             <section className="screen active">
               <article className="panel-card">
-                <p className="eyebrow">Grading</p>
-                <h2>{gradingStudent.name}</h2>
-                <p>{gradingModule?.title || "Module"}</p>
+                <h2>{gradingModule?.title || "Module"}</h2>
               </article>
               <article className="panel-card">
-                <p className="eyebrow">Submitted Work</p>
+                <h2>Submitted Work</h2>
                 <div className="records-list">
                   {submissions.length ? submissions.slice().reverse().map((record) => (
                     <article className="record-card" key={record.id}>
@@ -1500,7 +1479,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
                 </div>
               </article>
               <article className="panel-card">
-                <p className="eyebrow">Grade &amp; Feedback</p>
+                <h2>Grade &amp; Feedback</h2>
                 <form className="auth-form" onSubmit={handleSubmitFeedback}>
                   <label className="field-label">Score (0-100, optional)<input type="number" min={0} max={100} value={feedbackScore} onChange={(event) => setFeedbackScore(event.target.value)} /></label>
                   <label className="field-label">Comment for the student<textarea rows={5} placeholder="What did they do well? What should they improve?" value={feedbackComment} onChange={(event) => setFeedbackComment(event.target.value)} required /></label>

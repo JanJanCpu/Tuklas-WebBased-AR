@@ -99,15 +99,12 @@ export function AccountDetails({ user }: { user: AuthUser }) {
           <strong>{user.name}</strong>
           <span>@{user.username}</span>
         </span>
-        <span className="account-details-label"><strong>{role}</strong><span>Account details</span></span>
+        <span className="account-details-label"><strong>{role}</strong></span>
         <ChevronRight size={18} aria-hidden="true" />
       </button>
       <dialog ref={dialog} className="account-dialog" aria-labelledby="account-details-title">
         <div className="account-dialog-heading">
-          <div>
-            <p className="eyebrow">Signed in as {role}</p>
-            <h2 id="account-details-title">Account details</h2>
-          </div>
+          <h2 id="account-details-title">Account details</h2>
           <button type="button" className="account-close" aria-label="Close account details" onClick={() => dialog.current?.close()}>
             <X size={20} aria-hidden="true" />
           </button>
