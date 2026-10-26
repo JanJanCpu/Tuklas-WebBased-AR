@@ -1434,16 +1434,18 @@ function Workspace({ user }: { user: AuthUser | null }) {
                   const isExpanded = expandedStudentId === student.id;
                   return (
                     <article className="record-card" key={student.id}>
-                      <button
-                        type="button"
-                        className="row-between disclosure-toggle"
-                        onClick={() => setExpandedStudentId(isExpanded ? null : student.id)}
-                        aria-expanded={isExpanded}
-                      >
-                        <span><small>{student.username}</small><p>{student.name}</p></span>
-                        <span className={`disclosure-chevron ${isExpanded ? "open" : ""}`} aria-hidden="true"><ChevronRight size={18} strokeWidth={2.4} /></span>
-                      </button>
-                      <button type="button" className="secondary-button" aria-label={`Print slip for ${student.name}`} onClick={() => { setSlipStudent(student); slipDialog.current?.showModal(); }}><Printer size={16} />Print Slip</button>
+                      <div className="student-roster-row">
+                        <button
+                          type="button"
+                          className="row-between disclosure-toggle"
+                          onClick={() => setExpandedStudentId(isExpanded ? null : student.id)}
+                          aria-expanded={isExpanded}
+                        >
+                          <span><small>{student.username}</small><p>{student.name}</p></span>
+                          <span className={`disclosure-chevron ${isExpanded ? "open" : ""}`} aria-hidden="true"><ChevronRight size={18} strokeWidth={2.4} /></span>
+                        </button>
+                        <button type="button" className="secondary-button student-slip-button" aria-label={`Print slip for ${student.name}`} aria-haspopup="dialog" onClick={() => { setSlipStudent(student); slipDialog.current?.showModal(); }}><Printer size={16} aria-hidden="true" />Print Slip</button>
+                      </div>
                       {isExpanded && (
                         <div className="student-progress-panel">
                           {modules.map((module) => {
@@ -1531,14 +1533,14 @@ function Workspace({ user }: { user: AuthUser | null }) {
 
       <div className={`toast ${toast ? "show" : ""}`} role="status" aria-live="polite">{toast}</div>
       <dialog id="student-slip-dialog" className="account-dialog" ref={slipDialog} aria-labelledby="student-slip-title" onClose={(event) => { event.currentTarget.querySelector("form")?.reset(); setSlipStudent(null); }}>
-        <form className="auth-form" onSubmit={printStudentSlip}>
+        <form className="auth-form student-slip-form" onSubmit={printStudentSlip}>
           <h2 id="student-slip-title">Print Student Slip</h2>
-          <p>{slipStudent?.name} <small>@{slipStudent?.username}</small></p>
+          <p className="slip-student"><strong>{slipStudent?.name}</strong><small>@{slipStudent?.username}</small></p>
           <p id="student-slip-hint">Enter the student's current password. It will be printed as typed; the app cannot check it here.</p>
           <label className="field-label">Student password<input name="password" type="password" autoComplete="off" required aria-describedby="student-slip-hint" /></label>
           <div className="row-between">
             <button type="button" className="secondary-button" onClick={() => slipDialog.current?.close()}>Cancel</button>
-            <button type="submit" className="primary-button"><Printer size={18} />Print Slip</button>
+            <button type="submit" className="primary-button"><Printer size={18} aria-hidden="true" />Print Slip</button>
           </div>
         </form>
       </dialog>
@@ -1548,8 +1550,8 @@ function Workspace({ user }: { user: AuthUser | null }) {
             <div className="slip" key={slip.username}>
               <small>Tuklas AR Science Lab{slip.section ? ` - ${slip.section}` : ""}</small>
               <strong>{slip.name}</strong>
-              <span>Username: <b>{slip.username}</b></span>
-              <span>Password: <b>{slip.password}</b></span>
+              <span className="slip-credential">Username: <b>{slip.username}</b></span>
+              <span className="slip-credential">Password: <b>{slip.password}</b></span>
               <small>Open {window.location.host} and log in. Keep this slip private.</small>
             </div>
           ))}

@@ -2,7 +2,7 @@ import { ChevronRight } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 // Shown in Settings and in the fps HUD; bump on every build you want to confirm on a phone.
-export const BUILD = "b53";
+export const BUILD = "b54";
 const UPDATED = "October 13, 2026";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
