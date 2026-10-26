@@ -879,8 +879,8 @@ function Workspace({ user }: { user: AuthUser | null }) {
         </section>
         <section className="auth-card panel-card">
           <div className="auth-tabs">
-            <button type="button" className={authMode === "login" ? "active" : ""} onClick={() => { setAuthMode("login"); setAuthError(""); }}>Log In</button>
-            <button type="button" className={authMode === "signup" ? "active" : ""} onClick={() => { setAuthMode("signup"); setAuthError(""); }}>Teacher Sign Up</button>
+            <button type="button" className={authMode === "login" ? "active" : ""} aria-pressed={authMode === "login"} onClick={() => { setAuthMode("login"); setAuthError(""); }}>Log In</button>
+            <button type="button" className={authMode === "signup" ? "active" : ""} aria-pressed={authMode === "signup"} onClick={() => { setAuthMode("signup"); setAuthError(""); }}>Teacher Sign Up</button>
           </div>
 
           {authMode === "login" && (
@@ -966,7 +966,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
           <h1>{titles[screen][1]}</h1>
         </div>
         <div className="header-actions">
-          <button className="status-button">{online ? "Online" : "Offline"}</button>
+          <span className="status-button" role="status">{online ? "Online" : "Offline"}</span>
           <button className="logout-button" onClick={logout}>Logout</button>
         </div>
         <AccountDetails user={user} />
@@ -1105,7 +1105,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
                 )}
               </>
             ) : (
-              <article className="panel-card">
+              <article className="panel-card form-panel">
                 <p className="eyebrow">Prediction Questions</p>
                 <div className="prediction-questions">
                   {activeModule.predictions.map((prediction, questionIndex) => (
@@ -1119,7 +1119,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
                     </fieldset>
                   ))}
                 </div>
-                <textarea rows={3} placeholder="Why do you think so? (optional)" value={predictionNote} onChange={(event) => setPredictionNote(event.target.value)} />
+                <label className="field-label">Reasoning (optional)<textarea rows={3} placeholder="Why do you think so? (optional)" value={predictionNote} onChange={(event) => setPredictionNote(event.target.value)} /></label>
                 <button className="primary-button" onClick={async () => {
                   if (activeModule.predictions.some((_, index) => !selectedPredictions[index])) return showToast("Answer all prediction questions.");
                   const answers = activeModule.predictions.map((prediction, index) => `${index + 1}. ${prediction.question}\nAnswer: ${selectedPredictions[index]}`).join("\n\n");
@@ -1159,7 +1159,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
               </div>
               {viewMode === "ar" && <p className="camera-status">{cameraStatus}</p>}
             </div>
-            <article className="panel-card">
+            <article className="panel-card form-panel">
               <p className="eyebrow">Observation Prompt</p>
               <p>{activeModule.observe}</p>
               <div className="control-grid">
@@ -1208,7 +1208,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
                 <button className="primary-button" onClick={() => goTo("result")}>View Results</button>
               </article>
             ) : (
-              <article className="panel-card">
+              <article className="panel-card form-panel">
                 <p>Use your observations to explain the results.</p>
                 <label className="field-label">My predictions<textarea className="readonly-field" rows={10} value={predictionReview} readOnly aria-readonly="true" /></label>
                 <label className="field-label">Evidence from observation<textarea rows={5} placeholder="What did you observe? Include data or patterns." value={evidence} onChange={(event) => setEvidence(event.target.value)} /></label>
@@ -1241,10 +1241,10 @@ function Workspace({ user }: { user: AuthUser | null }) {
                 <p>{activeModuleFeedback.comment}</p>
               </article>
             )}
-            <article className="panel-card">
+            <article className="panel-card form-panel">
               <p className="eyebrow">Reflection Prompt</p>
               <p>What did you learn from this activity? How can this be applied in real life?</p>
-              <textarea rows={4} placeholder="Write your reflection..." value={reflection} onChange={(event) => setReflection(event.target.value)} />
+              <label className="field-label">My reflection<textarea rows={4} placeholder="Write your reflection..." value={reflection} onChange={(event) => setReflection(event.target.value)} /></label>
               <button className="secondary-button" onClick={async () => {
                 if (!reflection.trim()) return showToast("Write a reflection before saving.");
                 if (!isTeacherPreview) {
@@ -1260,7 +1260,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
         )}
 
         {screen === "settings" && (
-          <section className="screen active">
+          <section className="screen active settings-screen">
             {!installed && installPrompt && (
               <button className="settings-row" onClick={installApp}><span><strong>Install App</strong><small>Add Tuklas to your home screen, like a regular app.</small></span><span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span></button>
             )}
@@ -1353,7 +1353,6 @@ function Workspace({ user }: { user: AuthUser | null }) {
                 <button className="module-card" key={section.id} onClick={() => openSection(section.id)}>
                   <span className="student-avatar" aria-hidden="true">{section.name.trim().slice(0, 2).toUpperCase() || "SC"}</span>
                   <span><strong>{section.name}</strong><small>{section.studentCount} student{section.studentCount === 1 ? "" : "s"}</small></span>
-                  <small aria-hidden="true" />
                   <span className="row-chevron" aria-hidden="true"><ChevronRight size={20} strokeWidth={2.4} /></span>
                 </button>
               )) : <p className="muted">No sections yet. Create one above.</p>}
@@ -1523,7 +1522,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
             ((screen === "section" || screen === "grade") && item === "classes");
           const NavIcon = ({ home: Home, modules: BookOpen, classes: Users, settings: Settings } as Partial<Record<Screen, LucideIcon>>)[item]!;
           return (
-            <button key={item} className={isActive ? "active" : ""} onClick={() => goTo(item)}>
+            <button key={item} className={isActive ? "active" : ""} aria-current={isActive ? "page" : undefined} onClick={() => goTo(item)}>
               <NavIcon size={22} strokeWidth={isActive ? 2.4 : 2} aria-hidden="true" />
               <span>{item === "modules" ? "Modules" : item === "classes" ? "Classes" : item[0].toUpperCase() + item.slice(1)}</span>
             </button>
