@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { complement, earthLayers, template, type LabState } from "../lib/experiments";
+import { complement, earthAssemblyOrder, earthLayers, template, type LabState } from "../lib/experiments";
 
 export function ExperimentControls({ id, a, lab, onChange }: { id: string; a: number; lab: LabState; onChange: (next: LabState) => void }) {
   const [message, setMessage] = useState("");
@@ -27,7 +27,7 @@ export function ExperimentControls({ id, a, lab, onChange }: { id: string; a: nu
   </div>;
   if (id === "earth-scale") return <div className="earth-workbench">
     <p>Assemble from the center outward. Then select the lithosphere and asthenosphere overlays. Surface depths vary; the model uses representative values.</p>
-    <div className="experiment-presets">{[0, 4, 3, 5].map(index => <button key={index} disabled={lab.layers === 4} onClick={() => { const expected = [5, 4, 3, 0][lab.layers]; if (index === expected) { onChange({ ...lab, layers: lab.layers + 1 }); setMessage(`${earthLayers[index].name} placed at its scaled radius.`); } else setMessage("Build from the center outward. Use the depth labels to choose the next layer."); }}>Add {earthLayers[index].name}</button>)}<button onClick={() => { onChange({ ...lab, layers: 0 }); setMessage(""); }}>Clear assembly</button></div>
+    <div className="experiment-presets">{[...earthAssemblyOrder].reverse().map(index => <button key={index} disabled={lab.layers >= earthAssemblyOrder.length} onClick={() => { const expected = earthAssemblyOrder[lab.layers]; if (index === expected) { onChange({ ...lab, layers: lab.layers + 1 }); setMessage(`${earthLayers[index].name} placed at its scaled radius.`); } else setMessage("Build from the center outward. Use the depth labels to choose the next layer."); }}>Add {earthLayers[index].name}</button>)}<button onClick={() => { onChange({ ...lab, layers: 0 }); setMessage(""); }}>Clear assembly</button></div>
     <p role="status">{message}</p>
     <ul>{earthLayers.map(l => <li key={l.name}><strong>{l.name}</strong>: {l.depth} below surface{["Lithosphere", "Asthenosphere"].includes(l.name) ? " (mechanical region; overlaps compositional layers)" : ""}</li>)}</ul>
   </div>;

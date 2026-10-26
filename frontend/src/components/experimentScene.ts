@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import { circuitState, complement, controls, earthLayers, mutationState, originalDna, template, translate, type LabState } from "../lib/experiments";
+import { circuitState, complement, controls, earthAssemblyOrder, earthLayers, mutationState, originalDna, template, translate, type LabState } from "../lib/experiments";
 
 /** What a scene lets the student change from inside the model. ScienceScene supplies the pointer position and this API. */
 export interface InteractionApi {
@@ -685,7 +685,7 @@ export function createExperimentScene(root: THREE.Group, id: string) {
     const surface = new THREE.CanvasTexture(earthCanvas); surface.colorSpace = THREE.SRGBColorSpace;
 
     // Solid shells for each compositional layer, built from the center outward.
-    const buildOrder = [6, 5, 4, 3, 0];
+    const buildOrder = earthAssemblyOrder;
     // Lithosphere and asthenosphere cut across the compositional layers, so they are overlays
     // on the finished globe rather than steps you build. Named, not index-matched, because the
     // mini copy below has to know which clones to hide and index math broke when a layer was added.

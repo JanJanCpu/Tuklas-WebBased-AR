@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { modules, toPersistedModule } from '../backend/src/data/modules.ts';
-import { controls, getObservationDefaults, getObservationModel, circuitState, initialLabState, mutationState, translate, complement, template, earthLayers } from '../frontend/src/lib/experiments.ts';
+import { controls, getObservationDefaults, getObservationModel, circuitState, initialLabState, mutationState, translate, complement, template, earthLayers, earthAssemblyOrder } from '../frontend/src/lib/experiments.ts';
 
 assert.equal(modules.length, 12);
+assert.deepEqual(earthAssemblyOrder.map(index => earthLayers[index].name), ['Inner core', 'Outer core', 'Lower mantle', 'Upper mantle', 'Crust'], 'Assembly includes all five layers from center to surface');
+assert.ok(getObservationModel('earth-scale', 0, 0, { ...initialLabState(), layers: earthAssemblyOrder.length }).readouts.some(readout => readout.value === '5/5 compositional layers'));
 assert.equal(new Set(modules.map(m => m.id)).size, 12);
 assert.deepEqual([1, 2, 3, 4].map(q => modules.filter(m => m.quarterNumber === q).length), [6, 2, 2, 2]);
 assert.equal(new Set(modules.map(m => m.groupId)).size, 5);
