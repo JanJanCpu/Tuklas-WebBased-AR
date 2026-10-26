@@ -175,7 +175,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
   const [evidence, setEvidence] = useState("");
   const [explanation, setExplanation] = useState("");
   const [reflection, setReflection] = useState("");
-  const [viewMode, setViewMode] = useState<ViewMode>(() => (localStorage.getItem("tuklas-view-mode") as ViewMode | null) || "ar");
+  const [viewMode, setViewMode] = useState<ViewMode>("fallback");
   const [controlA, setControlA] = useState(0);
   const [controlB, setControlB] = useState(0);
   const [trialPulse, setTrialPulse] = useState(0);
@@ -372,10 +372,6 @@ function Workspace({ user }: { user: AuthUser | null }) {
     if (choice.outcome === "accepted") setInstalled(true);
     setInstallPrompt(null);
   }
-
-  useEffect(() => {
-    localStorage.setItem("tuklas-view-mode", viewMode);
-  }, [viewMode]);
 
   useEffect(() => {
     if (!online || !(screen === "home" && role === "teacher")) return;
@@ -860,7 +856,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
           <span className="hero-scan-icon" aria-hidden="true"><ScanLine size={18} strokeWidth={2.2} /></span>
           <p className="eyebrow">Grade 9 WebAR Science Learning</p>
           <h1 id="landingTitle">Tuklas AR Science Lab</h1>
-          <p>Predict, observe, and explain science concepts using camera-based classroom activities and offline-ready learning records.</p>
+          <p>Predict, observe, and explain science concepts using interactive 3D experiments, optional camera AR, and offline-ready learning records.</p>
         </section>
         <section className="auth-card panel-card">
           <div className="auth-tabs">
@@ -892,7 +888,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
         <section className="landing-flow" aria-label="Learning flow">
           {[
             ["Predict", "Guess what will happen"],
-            ["Observe", "Watch it play out in AR"],
+            ["Observe", "Try the 3D experiment"],
             ["Explain", "Say why it happened"],
           ].map(([step, hint], index) => (
             <article key={step}>
@@ -1127,7 +1123,7 @@ function Workspace({ user }: { user: AuthUser | null }) {
             {isTeacherPreview && <p className="teacher-preview-note"><Eye size={16} strokeWidth={2.4} aria-hidden="true" /><span>Teacher Preview - trials run normally but aren't saved as student work.</span></p>}
             <article className="ar-panel">
               <div className="row-between">
-                <div><p className="eyebrow">{viewMode === "ar" ? "Camera Mode" : "3D Model Mode"}</p><h2>{viewMode === "ar" ? "Start the camera and observe the trial" : "Use the model when camera access is unavailable"}</h2></div>
+                <div><p className="eyebrow">{viewMode === "ar" ? "Camera Mode" : "3D Model Mode"}</p><h2>{viewMode === "ar" ? "Start the camera and observe the trial" : "Explore the model - no camera or marker needed"}</h2></div>
                 <button className="text-button compact-button" onClick={() => setViewMode(viewMode === "ar" ? "fallback" : "ar")}>{viewMode === "ar" ? "Use 3D Model" : "Use Camera"}</button>
               </div>
             </article>

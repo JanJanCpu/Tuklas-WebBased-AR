@@ -2,7 +2,7 @@ import { ChevronRight } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 // Shown in Settings and in the fps HUD; bump on every build you want to confirm on a phone.
-export const BUILD = "b50";
+export const BUILD = "b51";
 const UPDATED = "October 13, 2026";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -19,7 +19,7 @@ const faqs: [string, string][] = [
   ["I forgot my password.", "Ask your teacher. They can give you a new password from their class list. The old password stops working right away."],
   ["Does it work without internet?", "Yes. Open the app once while online, go to Settings and tap Prepare for Offline Use. After that you can log in and do activities offline. Your work is saved on the device and sent to your teacher the next time you are online."],
   ["What is the marker for?", "The printed TUKLAS marker is where the experiment appears in camera mode. Point the camera at it and keep the whole marker in view. One printed marker can be shared by a group."],
-  ["The camera does not work. Can I still do the activity?", "Yes. Tap Use 3D Model. You will see the same experiment on screen without the camera or marker."],
+  ["Do I need a camera or printed marker?", "No. Experiments open in 3D Model Mode without a camera or marker. To try AR, tap Use Camera and point it at the printed TUKLAS marker. Tap Use 3D Model to return."],
   ["Can I change my answer after I submit?", "No. Each Predict, Observe and Explain answer is locked once saved, so your prediction stays your own. If you need to redo a lesson, ask your teacher to reset your progress."],
   ["The app looks old or broken after an update.", "Close the app fully and open it again while online. If that does not help, clear the site data in your browser settings and log in again."],
   ["Why is the experiment slow on my phone?", "The app lowers the graphics quality on its own when a phone is slow. Close other apps and keep the marker steady and well lit."],
@@ -71,13 +71,13 @@ export default function AppInfo() {
 const tips = {
   student: [
     ["Predict", "Before each experiment, write what you think will happen. There is no wrong prediction."],
-    ["Observe", "Point the camera at the printed TUKLAS marker and keep it in view, or tap Use 3D Model. Drag and tap the parts to run trials."],
+    ["Observe", "The 3D model opens first. Drag and tap the parts to run trials. To try AR, tap Use Camera and point it at the printed TUKLAS marker."],
     ["Explain", "Compare what you saw with your prediction. Your answers go to your teacher, even if you were offline."],
   ],
   teacher: [
-    ["Make a class", "Go to Classes, create a section, then use Add Whole Class to paste your class list."],
+    ["Try a lesson", "Tap Preview Lessons and choose an experiment. The 3D model needs no camera or marker, and preview work is not saved as student work."],
+    ["Make a class", "When ready to use Tuklas with students, go to Classes, create a section, then use Add Whole Class to paste your class list."],
     ["Give out logins", "Print the login slips, or send each one by SMS or email from your own phone."],
-    ["Print the marker", "One printed TUKLAS marker per group is enough. Use Preview Lessons to try each activity first."],
   ],
 } as const;
 

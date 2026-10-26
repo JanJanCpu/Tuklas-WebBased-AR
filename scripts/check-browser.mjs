@@ -44,7 +44,7 @@ await evaluate(`try { sessionStorage.removeItem('testRole'); } catch { /* New ab
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
 await send('Page.addScriptToEvaluateOnNewDocument', { source: `
 localStorage.setItem('tuklas-user', JSON.stringify({ id: 'browser-test-${Date.now()}-' + (sessionStorage.testRole || 'teacher'), username: 'test', name: 'Browser Test', role: sessionStorage.testRole || 'teacher', sectionId: null }));
-localStorage.setItem('tuklas-token', 'test-only'); localStorage.setItem('tuklas-view-mode', 'fallback');
+localStorage.setItem('tuklas-token', 'test-only'); localStorage.setItem('tuklas-view-mode', 'ar');
 const realFetch = window.fetch.bind(window);
 ${offline ? `Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => sessionStorage.testOffline !== '1' });` : ''}
 window.__records = [];
@@ -93,6 +93,7 @@ for (const experiment of modules) {
   await card(experiment.title);
   await click('Next');
   await waitFor(`document.querySelector('.three-scene canvas') !== null`);
+  if (experiment.id === 'inertia') assert.equal(await evaluate(`!!document.querySelector('.fallback-mode') && !document.querySelector('.camera-status')`), true, 'First experiment opens in 3D even with a legacy camera preference');
   if (await evaluate(`document.body.innerText.includes('Use 3D Model')`)) await click('Use 3D Model');
   await sleep(500);
   // Sweep both inputs to their maxima and back to exercise state/scene transitions.

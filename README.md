@@ -2,6 +2,8 @@
 
 Full-stack browser-delivered WebAR PWA for Grade 9 Predict-Observe-Explain science activities.
 
+Experiments start in **3D Model Mode** whenever the app opens or a user signs in, including on browsers that previously saved a camera preference. No camera or marker is required. **Use Camera** switches to marker-based AR during the session; **Use 3D Model** switches back. Teachers can use **Home → Preview Lessons** without creating a class, and preview answers are not saved as student work.
+
 ## Tech Stack
 
 - Frontend: React, TypeScript, Vite, Three.js, AR.js
