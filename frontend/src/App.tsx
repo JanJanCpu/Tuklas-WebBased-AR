@@ -13,6 +13,7 @@ import { AccountDetails } from "./components/AccountDetails";
 import type { ActivityRecord, AuthUser, ClassProgressRecord, Feedback, LearningModule, Role, Screen, Section, SectionSummary, Stage, ViewMode } from "./types/domain";
 import AppInfo, { GettingStarted } from "./components/AppInfo";
 import { clearCache, readCache, writeCache } from "./lib/cache";
+import appQrCode from "./assets/tuklas-app-qr.png";
 import { Activity, BookOpen, ChevronLeft, ChevronRight, CircuitBoard, Download, KeyRound, Mail, MessageSquare, Earth, Eye, Home, Microscope, Printer, ScanLine, Settings, Thermometer, Users, type LucideIcon } from "lucide-react";
 
 // three.js (pulled in by ScienceScene) is a heavy dependency that only the
@@ -1533,8 +1534,9 @@ function Workspace({ user }: { user: AuthUser | null }) {
               <strong>{slip.name}</strong>
               <span className="slip-credential">Username: <b>{slip.username}</b></span>
               <span className="slip-credential">Password: <b>{slip.password}</b></span>
+              <img className="slip-qr" src={appQrCode} alt="Scan to open Tuklas AR Science Lab" />
               <small>App: <a href={PUBLIC_APP_URL}>{PUBLIC_APP_URL}</a></small>
-              <small>Open the link and log in. Keep this slip private.</small>
+              <small>Scan the QR code or open the link to log in. Keep this slip private.</small>
             </div>
           ))}
         </div>,

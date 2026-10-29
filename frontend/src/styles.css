@@ -2252,6 +2252,7 @@ input[type="range"] {
 
 .slip {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) 30mm;
   min-width: 0;
   gap: 4px;
   padding: 14px 16px;
@@ -2263,7 +2264,21 @@ input[type="range"] {
 
 .slip-credential {
   display: grid;
+  grid-column: 1;
   gap: 2px;
+}
+
+.slip > small,
+.slip > strong {
+  grid-column: 1 / -1;
+}
+
+.slip-qr {
+  grid-column: 2;
+  grid-row: 3 / 5;
+  align-self: center;
+  width: 30mm;
+  height: 30mm;
 }
 
 .slip strong {
