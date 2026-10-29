@@ -31,6 +31,7 @@ const REQUIRED_STAGES: Stage[] = ["Predict", "Observe", "Explain"];
 // so a teacher sees new submissions - and a reset student sees their
 // screen unlock - without needing to navigate away and back.
 const LIVE_REFRESH_MS = 15000;
+const PUBLIC_APP_URL = "https://tuklas-web-based-ar-frontend-nine.vercel.app";
 
 // Not yet part of lib.dom.d.ts; Chrome/Edge-only event carrying the deferred
 // install prompt (see the beforeinstallprompt listener below).
@@ -1532,7 +1533,8 @@ function Workspace({ user }: { user: AuthUser | null }) {
               <strong>{slip.name}</strong>
               <span className="slip-credential">Username: <b>{slip.username}</b></span>
               <span className="slip-credential">Password: <b>{slip.password}</b></span>
-              <small>Open {window.location.host} and log in. Keep this slip private.</small>
+              <small>App: <a href={PUBLIC_APP_URL}>{PUBLIC_APP_URL}</a></small>
+              <small>Open the link and log in. Keep this slip private.</small>
             </div>
           ))}
         </div>,
