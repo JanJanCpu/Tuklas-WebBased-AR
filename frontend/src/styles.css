@@ -2250,14 +2250,18 @@ input[type="range"] {
   }
 }
 
+.slip-handout {
+  min-width: 0;
+  border: 1px dashed #888;
+  break-inside: avoid;
+}
+
 .slip {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 30mm;
   min-width: 0;
   gap: 4px;
   padding: 14px 16px;
-  border: 1px dashed #888;
-  break-inside: avoid;
   font-size: 11pt;
   overflow-wrap: anywhere;
 }
@@ -2298,6 +2302,33 @@ input[type="range"] {
 
 .slip a {
   color: inherit;
+}
+
+.slip-marker {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 7px 16px 12px;
+  border-top: 1px dashed #888;
+  background: #fff;
+  text-align: center;
+}
+
+.slip-marker > small {
+  color: #444;
+  font-size: 8.5pt;
+  line-height: 1.35;
+}
+
+.slip-marker > strong {
+  margin-top: 3px;
+  font-size: 11pt;
+}
+
+.slip-marker > img {
+  display: block;
+  width: 60mm;
+  height: 60mm;
 }
 
 .slip-row {

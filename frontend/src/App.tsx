@@ -742,7 +742,14 @@ function Workspace({ user }: { user: AuthUser | null }) {
     URL.revokeObjectURL(url);
   }
 
-  function printSlips() {
+  async function printSlips() {
+    try {
+      await Promise.all(Array.from(document.querySelectorAll<HTMLImageElement>(".slip-sheet img"), (image) => image.decode()));
+    } catch {
+      setSingleSlip(null);
+      showToast("The slip images could not load. Please try printing again.");
+      return;
+    }
     document.body.classList.add("printing-slips");
     window.addEventListener("afterprint", () => {
       document.body.classList.remove("printing-slips");
@@ -1529,15 +1536,23 @@ function Workspace({ user }: { user: AuthUser | null }) {
       {printableSlips.length > 0 && createPortal(
         <div className="slip-sheet">
           {printableSlips.map((slip) => (
-            <div className="slip" key={slip.username}>
-              <small>Tuklas AR Science Lab{slip.section ? ` - ${slip.section}` : ""}</small>
-              <strong>{slip.name}</strong>
-              <span className="slip-credential">Username: <b>{slip.username}</b></span>
-              <span className="slip-credential">Password: <b>{slip.password}</b></span>
-              <img className="slip-qr" src={appQrCode} alt="Scan to open Tuklas AR Science Lab" />
-              <small>App: <a href={PUBLIC_APP_URL}>{PUBLIC_APP_URL}</a></small>
-              <small>Scan the QR code or open the link to log in. Keep this slip private.</small>
-            </div>
+            <article className="slip-handout" key={slip.username}>
+              <div className="slip">
+                <small>Tuklas AR Science Lab{slip.section ? ` - ${slip.section}` : ""}</small>
+                <strong>{slip.name}</strong>
+                <span className="slip-credential">Username: <b>{slip.username}</b></span>
+                <span className="slip-credential">Password: <b>{slip.password}</b></span>
+                <img className="slip-qr" src={appQrCode} alt="Scan to open Tuklas AR Science Lab" />
+                <small>App: <a href={PUBLIC_APP_URL}>{PUBLIC_APP_URL}</a></small>
+                <small>Scan the QR code or open the link to log in. Keep this slip private.</small>
+              </div>
+              <section className="slip-marker">
+                <small>Cut here · keep your login details private</small>
+                <strong>AR activity marker</strong>
+                <img src="/assets/tuklas-flask.png" alt="Tuklas flask AR marker" />
+                <small>Open an activity and choose Use Camera.<br />Keep the full black border in view.</small>
+              </section>
+            </article>
           ))}
         </div>,
         document.body,
